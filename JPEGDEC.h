@@ -22,6 +22,8 @@
 #define VLC_BUF_SIZE 2048
 #define VLC_HIGHWATER 1536
 #define FILE_BUF_SIZE 2048
+#define HUFF_TABLEN  273
+#define DCTSIZE 64
 
 // RGB565 pixel byte order
 #define BIG_ENDIAN_PIXELS 0
@@ -56,9 +58,10 @@ typedef void (JPEG_CLOSE_CALLBACK)(void *pHandle);
 typedef struct jpeg_image_tag
 {
     int iWidth, iHeight;
-    uint8_t ucBpp, ucSubSample, ucLittleEndian;
+    uint8_t ucBpp, ucSubSample, ucLittleEndian, ucHuffTableUsed;
     int iVLCOff; // current VLC data offset
     int iVLCSize; // current quantity of data in the VLC buffer
+    int iResInterval;
     JPEG_READ_CALLBACK *pfnRead;
     JPEG_SEEK_CALLBACK *pfnSeek;
     JPEG_DRAW_CALLBACK *pfnDraw;
@@ -66,6 +69,8 @@ typedef struct jpeg_image_tag
     JPEG_CLOSE_CALLBACK *pfnClose;
     JPEGFILE JPEGFile;
     uint16_t usMCUBuf[16*16]; // current MCU
+    int16_t sQuantTable[DCTSIZE*2]; // quantization tables
+    uint8_t ucHuffVals[HUFF_TABLEN*8];
     uint8_t ucFileBuf[FILE_BUF_SIZE]; // holds temp data and pixel stack
     uint8_t ucVLC[VLC_BUF_SIZE];
     unsigned short usHuffTable[4096];
