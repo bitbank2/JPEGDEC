@@ -60,6 +60,7 @@ typedef struct jpeg_image_tag
 {
     int iWidth, iHeight;
     uint8_t ucBpp, ucSubSample, ucLittleEndian, ucHuffTableUsed;
+    uint8_t ucMode;
     int iVLCOff; // current VLC data offset
     int iVLCSize; // current quantity of data in the VLC buffer
     int iResInterval;
@@ -74,6 +75,8 @@ typedef struct jpeg_image_tag
     uint8_t ucHuffVals[HUFF_TABLEN*8];
     uint8_t ucFileBuf[FILE_BUF_SIZE]; // holds temp data and pixel stack
     uint8_t ucVLC[VLC_BUF_SIZE];
+    uint8_t ucHuffDC[4096];
+    uint8_t ucHuffAC[4096];
     unsigned short usHuffTable[4096];
 } JPEGIMAGE;
 
