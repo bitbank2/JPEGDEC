@@ -138,8 +138,7 @@ int JPEGDEC::decode()
 static int JPEGInit(JPEGIMAGE *pJPEG)
 {
     pJPEG->JPEGFile.iPos = 0; // start at beginning of file
-    JPEGParseInfo(pJPEG); // gather info for image
-  return 1;
+    return JPEGParseInfo(pJPEG); // gather info for image
 } /* GIFInit() */
 //
 // Unpack the Huffman tables
@@ -240,12 +239,12 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
                 return 0; // currently unsupported modes
                 
             case 0xffc0: // SOFx - start of frame
-                pPage->ucBpp = s[iOffset+4]; // bits per sample
-                pPage->iHeight = MOTOSHORT(&s[iOffset+5]);
-                pPage->iWidth = MOTOSHORT(&s[iOffset+7]);
-                iNumComponents = s[iOffset+9];
+                pPage->ucBpp = s[iOffset+2]; // bits per sample
+                pPage->iHeight = MOTOSHORT(&s[iOffset+3]);
+                pPage->iWidth = MOTOSHORT(&s[iOffset+5]);
+                iNumComponents = s[iOffset+7];
                 pPage->ucBpp = pPage->ucBpp * iNumComponents; /* Bpp = number of components * bits per sample */
-                pPage->ucSubSample = s[iOffset+11]; // subsampling option for the second color component
+                pPage->ucSubSample = s[iOffset+9]; // subsampling option for the second color component
                 pPage->ucSubSample = (pPage->ucSubSample & 0xf) | (pPage->ucSubSample >> 2);
                 break;
             case 0xffdd: // Restart Interval
@@ -278,7 +277,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
                         }
                         usLen -= (DCTSIZE*2 + 1);
                     }
-                    else
+                    else // byte precision
                     {
                         for (i=0; i<DCTSIZE; i++)
                         {

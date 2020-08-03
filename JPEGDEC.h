@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #define memcpy_P memcpy
+#define PROGMEM
 #else
 #include <Arduino.h>
 #endif
