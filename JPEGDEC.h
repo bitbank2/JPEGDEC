@@ -1,6 +1,6 @@
 #ifndef __JPEGDEC__
 #define __JPEGDEC__
-#ifdef __MACH__
+#if defined( __MACH__ ) || defined( __LINUX__ )
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -24,7 +24,17 @@
 #define VLC_HIGHWATER 1536
 #define FILE_BUF_SIZE 2048
 #define HUFF_TABLEN  273
+#define HUFF_EXPANDED_SIZE (2048+64)
 #define DCTSIZE 64
+
+// Decoder options
+#define JPEG_AUTO_ROTATE 1
+#define JPEG_SCALE_HALF 2
+#define JPEG_SCALE_QUARTER 4
+#define JPEG_SCALE_EIGHTH 8
+#define JPEG_LE_PIXELS 16
+#define JPEG_EXIF_THUMBNAIL 32
+#define JPEG_GRAYSCALE 64
 
 // RGB565 pixel byte order
 #define BIG_ENDIAN_PIXELS 0
@@ -60,7 +70,8 @@ typedef struct jpeg_image_tag
 {
     int iWidth, iHeight;
     uint8_t ucBpp, ucSubSample, ucLittleEndian, ucHuffTableUsed;
-    uint8_t ucMode;
+    uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
+    int iEXIF; // Offset to EXIF 'TIFF' file
     int iVLCOff; // current VLC data offset
     int iVLCSize; // current quantity of data in the VLC buffer
     int iResInterval;
@@ -89,12 +100,13 @@ class JPEGDEC
     int open(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
     int open(char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw);
     void close();
-    void begin(int iEndian);
-    int decode();
+    int decode(int iOptions);
+    int getOrientation();
     int getWidth();
     int getHeight();
     int getBpp();
     int getSubSample();
+    int hasThumb();
 
   private:
     JPEGIMAGE _jpeg;

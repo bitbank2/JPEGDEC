@@ -58,6 +58,7 @@ static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition)
 //
 int JPEGDEC::open(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
+    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
     _jpeg.pfnRead = readMem;
     _jpeg.pfnSeek = seekMem;
     _jpeg.pfnDraw = pfnDraw;
@@ -68,6 +69,11 @@ int JPEGDEC::open(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
     return JPEGInit(&_jpeg);
 } /* open() */
 
+int JPEGDEC::getOrientation()
+{
+    return (int)_jpeg.ucOrientation;
+} /* getOrientation() */
+
 int JPEGDEC::getWidth()
 {
     return _jpeg.iWidth;
@@ -77,6 +83,11 @@ int JPEGDEC::getHeight()
 {
     return _jpeg.iHeight;
 } /* getHeight() */
+
+int JPEGDEC::hasThumb()
+{
+    return (int)_jpeg.ucHasThumb;
+} /* hasThumb() */
 
 int JPEGDEC::getBpp()
 {
@@ -93,6 +104,7 @@ int JPEGDEC::getSubSample()
 //
 int JPEGDEC::open(char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
 {
+    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
     _jpeg.pfnRead = pfnRead;
     _jpeg.pfnSeek = pfnSeek;
     _jpeg.pfnDraw = pfnDraw;
@@ -111,20 +123,15 @@ void JPEGDEC::close()
         (*_jpeg.pfnClose)(_jpeg.JPEGFile.fHandle);
 } /* close() */
 
-void JPEGDEC::begin(int iEndian)
-{
-    memset(&_jpeg, 0, sizeof(_jpeg));
-    _jpeg.ucLittleEndian = (iEndian == LITTLE_ENDIAN_PIXELS);
-}
 //
 // Play a single frame
 // returns:
 // 1 = good result and more frames exist
 // 0 = good result and no more frames exist
 // -1 = error
-int JPEGDEC::decode()
+int JPEGDEC::decode(int iOptions)
 {
-    return DecodeJPEG(&_jpeg, 0);
+    return DecodeJPEG(&_jpeg, iOptions);
 } /* decode() */
 //
 // The following functions are written in plain C and have no
@@ -137,7 +144,6 @@ int JPEGDEC::decode()
 //
 static int JPEGInit(JPEGIMAGE *pJPEG)
 {
-    pJPEG->JPEGFile.iPos = 0; // start at beginning of file
     return JPEGParseInfo(pJPEG); // gather info for image
 } /* GIFInit() */
 //
@@ -179,6 +185,201 @@ static int JPEGGetHuffTables(uint8_t *pBuf, int iLen, JPEGIMAGE *pJPEG)
     }
     return 0;
 } /* JPEGGetHuffTables() */
+/****************************************************************************
+ *                                                                          *
+ *  FUNCTION   : JPEGMakeHuffTables_Slow(JPEGDATA *, PILBOOL)                  *
+ *                                                                          *
+ *  PURPOSE    : Create the expanded Huffman tables for "slow" decode.      *
+ *                                                                          *
+ ****************************************************************************/
+int JPEGMakeHuffTables_Slow(JPEGDATA *pJPEG, PILBOOL bThumbnail)
+{
+    int code, repeat, count, codestart;
+    int j;
+    int iLen, iTable;
+    unsigned short *pTable, *pShort, *pLong;
+    unsigned char *pucTable, *pucShort, *pucLong;
+    uint32_t ul, *pLongTable;
+    int iBitNum; // current code bit length
+    int cc; // code
+    unsigned char *p, *pBits, ucCode;
+    int iMaxLength, iMaxMask;
+
+    pJPEG->b11Bit = 1; // indicate we're using the bigger A/C decode tables
+    // first do DC components (up to 4 tables of 12-bit codes)
+    // we can save time and memory for the DC codes by knowing that there exist short codes (<= 6 bits)
+    // and long codes (>6 bits, but the first 5 bits are 1's).  This allows us to create 2 tables: a 6-bit and 7 or 8-bit
+    // to handle any DC codes
+    iMaxLength = 12; // assume DC codes can be 12-bits
+    iMaxMask = 0x7f; // lower 7 bits after truncate 5 leading 1's
+    if (pJPEG->iMode == 0xc3) // create 13-bit tables for lossless mode
+    {
+        iMaxLength = 13;
+        iMaxMask = 0xff;
+    }
+    for (iTable = 0; iTable < 2; iTable++)
+    {
+        if (pJPEG->ucHuffTableUsed[iTable])
+        {
+            //         pJPEG->huffdcFast[iTable] = (int *)PILIOAlloc(0x180); // short table = 128 bytes, long table = 256 bytes
+            pucShort = (unsigned char *)pJPEG->huffdcFast[iTable];
+            //         pJPEG->huffdc[iTable] = pJPEG->huffdcFast[iTable] + 0x20; // 0x20 longs = 128 bytes
+            pucLong = (unsigned char *)pJPEG->huffdc[iTable];
+            pBits = &pJPEG->ucHuffVals[iTable * HUFF_TABLEN];
+            p = pBits;
+            p += 16; // point to bit data
+            cc = 0; // start with a code of 0
+            for (iBitNum = 1; iBitNum <= 16; iBitNum++)
+            {
+                iLen = *pBits++; // get number of codes for this bit length
+                if (iBitNum > iMaxLength && iLen > 0) // we can't handle codes longer a certain length
+                {
+                    return -1;
+                }
+                while (iLen)
+                {
+                    //               if (iBitNum > 6) // do long table
+                    if ((cc >> (iBitNum-5)) == 0x1f) // first 5 bits are 1 - use long table
+                    {
+                        count = iMaxLength - iBitNum;
+                        codestart = cc << count;
+                        pucTable = &pucLong[codestart & iMaxMask]; // use lower 7/8 bits of code
+                    }
+                    else // do short table
+                    {
+                        count = 6 - iBitNum;
+                        if (count < 0)
+                            return -1; // DEBUG - something went wrong
+                        codestart = cc << count;
+                        pucTable = &pucShort[codestart];
+                    }
+                    ucCode = *p++;  // get actual huffman code
+                    if (ucCode == 16 && pJPEG->iMode == 0xc3) // lossless mode
+                    {
+                        // in lossless mode, this code won't fit in 4 bits, so save it's length in the next slot
+                        ucCode = 255;
+                        pucLong[256] = (unsigned char)iBitNum;
+                    }
+                    // does precalculating the DC value save time on ARM?
+#ifndef USE_ARM_ASM
+                    if (ucCode != 0 && (ucCode + iBitNum) <= 6 && pJPEG->iMode != 0xc2) // we can fit the magnitude value in the code lookup (not for progressive)
+                    {
+                        int k, iLoop;
+                        unsigned char ucCoeff;
+                        unsigned char *d = &pucTable[512];
+                        unsigned char ucMag = ucCode;
+                        ucCode |= ((iBitNum+ucCode) << 4); // add magnitude bits to length
+                        repeat = 1<<ucMag;
+                        iLoop = 1<<(count-ucMag);
+                        for (j=0; j<repeat; j++)
+                        { // calcuate the magnitude coeff already
+                            if (j & 1<<(ucMag-1)) // positive number
+                                ucCoeff = (unsigned char)j;
+                            else // negative number
+                                ucCoeff = (unsigned char)(j - ((1<<ucMag)-1));
+                            for (k=0; k<iLoop; k++)
+                            {
+                                *d++ = ucCoeff;
+                            } // for k
+                        } // for j
+                    }
+#endif
+                    else
+                    {
+                        ucCode |= (iBitNum << 4);
+                    }
+                    if (count) // do it as dwords to save time
+                    {
+                        repeat = (1<<count);
+                        memset(pucTable, ucCode, repeat);
+                        //                  pLongTable = (uint32_t *)pTable;
+                        //                  repeat = 1 << (count-2); // store as dwords (/4)
+                        //                  ul = code | (code << 16);
+                        //                  for (j=0; j<repeat; j++)
+                        //                     *pLongTable++ = ul;
+                    }
+                    else
+                    {
+                        pucTable[0] = ucCode;
+                    }
+                    cc++;
+                    iLen--;
+                }
+                cc <<= 1;
+            }
+        } // if table defined
+    }
+    // now do AC components (up to 2 tables of 16-bit codes)
+    // We split the codes into a short table (9 bits or less) and a long table (first 5 bits are 1)
+    for (iTable = 0; iTable < 4; iTable++)
+    {
+        if (pJPEG->ucHuffTableUsed[iTable+4])  // if this table is defined
+        {
+            pBits = &pJPEG->ucHuffVals[(iTable+4) * HUFF_TABLEN];
+            p = pBits;
+            p += 16; // point to bit data
+            //         pJPEG->huffacFast[iTable] = (int *)PILIOAlloc(0x1400); // fast table = 1024 bytes, slow = 4096
+            //         pJPEG->huffac[iTable] = pJPEG->huffacFast[iTable] + 0x100; // 0x100 longs = 1024 bytes
+            if (iTable > 0) // use other buffer
+                pShort = (unsigned short *)&pJPEG->ucAltHuff[(iTable-1)*0x4000];
+            else
+                pShort = (unsigned short *)pJPEG->huffacFast[0];
+            pLong = &pShort[0x1000]; //(unsigned short *)pJPEG->huffac[iTable*2];
+            cc = 0; // start with a code of 0
+            // construct the decode table
+            for (iBitNum = 1; iBitNum <= 16; iBitNum++)
+            {
+                iLen = *pBits++; // get number of codes for this bit length
+                while (iLen)
+                {
+                    if ((cc >> (iBitNum-4)) == 0xf) // first 4 bits are 1 - use long table
+                    {
+                        count = 16 - iBitNum;
+                        codestart = cc << count;
+                        pTable = &pLong[codestart & 0xfff]; // use lower 12 bits of code
+                    }
+                    else
+                    {
+                        count = 12 - iBitNum;
+                        if (count < 0) // a 13-bit? code - that doesn't fit our optimized scheme, see if we can do a bigger table version
+                        {
+                            return -1; // DEBUG - fatal error, we currently don't support it
+                        }
+                        codestart = cc << count;
+                        pTable = &pShort[codestart]; // 11 bits or shorter
+                    }
+                    code = *p++;  // get actual huffman code
+                    if (bThumbnail && code != 0) // add "extra" bits to code length since we skip these codes
+                    {
+                        // get rid of extra bits in code and add increment (1) for AC index
+                        code = ((iBitNum+(code & 0xf)) << 8) | ((code >> 4)+1);
+                    }
+                    else
+                    {
+                        code |= (iBitNum << 8);
+                    }
+                    if (count) // do it as dwords to save time
+                    {
+                        repeat = 1 << (count-1); // store as dwords (/2)
+                        ul = code | (code << 16);
+                        pLongTable = (uint32_t *)pTable;
+                        for (j=0; j<repeat; j++)
+                            *pLongTable++ = ul;
+                    }
+                    else
+                    {
+                        pTable[0] = (unsigned short)code;
+                    }
+                    cc++;
+                    iLen--;
+                }
+                cc <<= 1;
+            } // for each bit length
+        } // if table defined
+    }
+    return 0;
+} /* JPEGMakeHuffTables_Slow() */
+
 //
 // Expand the Huffman tables for fast decoding
 //
@@ -327,10 +528,7 @@ int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
                         {
                             if (count == -1 && iTablesUsed <= 4) // we need to create "slow" tables
                             {
-//                                j = JPEGMakeHuffTables_Slow(pJPEG, bThumbnail);
-//                                pJPEG->huffacFast[1] = (int *) &pJPEG->ucAltHuff[0x0000];
-//                                pJPEG->huffacFast[2] = (int *) &pJPEG->ucAltHuff[0x4000];
-//                                pJPEG->huffacFast[3] = (int *) &pJPEG->ucAltHuff[0x8000];
+                                j = JPEGMakeHuffTables_Slow(pJPEG, bThumbnail);
                                 return j;
                             }
                             else
@@ -395,6 +593,36 @@ int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
 } /* JPEGMakeHuffTables() */
 
 //
+// TIFFSHORT
+// read a 16-bit unsigned integer from the given pointer
+// and interpret the data as big endian (Motorola) or little endian (Intel)
+//
+uint16_t TIFFSHORT(unsigned char *p, int bMotorola)
+{
+    unsigned short s;
+
+    if (bMotorola)
+        s = *p * 0x100 + *(p+1); // big endian (AKA Motorola byte order)
+    else
+        s = *p + *(p+1)*0x100; // little endian (AKA Intel byte order)
+    return s;
+} /* TIFFSHORT() */
+//
+// TIFFLONG
+// read a 32-bit unsigned integer from the given pointer
+// and interpret the data as big endian (Motorola) or little endian (Intel)
+//
+uint32_t TIFFLONG(unsigned char *p, int bMotorola)
+{
+    uint32_t l;
+
+    if (bMotorola)
+        l = *p * 0x1000000 + *(p+1) * 0x10000 + *(p+2) * 0x100 + *(p+3); // big endian
+    else
+        l = *p + *(p+1) * 0x100 + *(p+2) * 0x10000 + *(p+3) * 0x1000000; // little endian
+    return l;
+} /* TIFFLONG() */
+//
 // Parse the JPEG header, gather necessary info to decode the image
 // Returns 1 for success, 0 for failure
 //
@@ -440,6 +668,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
         usMarker = MOTOSHORT(&s[iOffset]);
         iOffset += 2;
         usLen = MOTOSHORT(&s[iOffset]); // marker length
+
         if (usMarker < 0xffc0 || usMarker == 0xffff) // invalid marker, could be generated by "Arles Image Web Page Creator" or Accusoft
         {
             iOffset++;
@@ -452,6 +681,17 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
             case 0xffc3:
                 return 0; // currently unsupported modes
                 
+	    case 0xffe1: // App1 (EXIF?)
+		if (s[iOffset+2] == 'E' && s[iOffset+3] == 'x' && (s[iOffset+8] == 'M' || s[iOffset+8] == 'I')) // the EXIF data we want
+		{
+		    pPage->iEXIF = iFilePos + iOffset + 8; // start of TIFF file
+		    // Get the orientation value (if present)
+		    int bMotorola = (s[iOffset+8] == 'M');
+		    int IFD = TIFFLONG(&s[iOffset+12], bMotorola);
+		    printf("TIFF IFD = %d\n");
+		    // TIFFInfo(pPage, bMotorola, IFD);
+		}
+		break;
             case 0xffc0: // SOFx - start of frame
                 pPage->ucMode = (uint8_t)usMarker;
                 pPage->ucBpp = s[iOffset+2]; // bits per sample
