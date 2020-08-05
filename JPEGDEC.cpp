@@ -28,6 +28,334 @@ static int JPEGParseInfo(JPEGIMAGE *pPage);
 static void JPEGGetMoreData(JPEGIMAGE *pPage);
 static int DecodeJPEG(JPEGIMAGE *pImage, int iOptions);
 
+/* JPEG tables */
+// zigzag ordering of DCT coefficients
+static const unsigned char cZigZag[64] = {0,1,5,6,14,15,27,28,
+    2,4,7,13,16,26,29,42,
+    3,8,12,17,25,30,41,43,
+    9,11,18,24,31,40,44,53,
+    10,19,23,32,39,45,52,54,
+    20,22,33,38,46,51,55,60,
+    21,34,37,47,50,56,59,61,
+    35,36,48,49,57,58,62,63};
+
+// un-zigzag ordering
+static const unsigned char cZigZag2[64] = {0,1,8,16,9,2,3,10,
+    17,24,32,25,18,11,4,5,
+    12,19,26,33,40,48,41,34,
+    27,20,13,6,7,14,21,28,
+    35,42,49,56,57,50,43,36,
+    29,22,15,23,30,37,44,51,
+    58,59,52,45,38,31,39,46,
+    53,60,61,54,47,55,62,63};
+
+// For AA&N IDCT method, multipliers are equal to quantization
+// coefficients scaled by scalefactor[row]*scalefactor[col], where
+// scalefactor[0] = 1
+// scalefactor[k] = cos(k*PI/16) * sqrt(2)    for k=1..7
+// For integer operation, the multiplier table is to be scaled by
+// IFAST_SCALE_BITS.
+static const int iScaleBits[64] = {16384, 22725, 21407, 19266, 16384, 12873,  8867,  4520,
+    22725, 31521, 29692, 26722, 22725, 17855, 12299,  6270,
+    21407, 29692, 27969, 25172, 21407, 16819, 11585,  5906,
+    19266, 26722, 25172, 22654, 19266, 15137, 10426,  5315,
+    16384, 22725, 21407, 19266, 16384, 12873,  8867,  4520,
+    12873, 17855, 16819, 15137, 12873, 10114,  6967,  3552,
+    8867, 12299, 11585, 10426,  8867,  6967,  4799,  2446,
+    4520,  6270,  5906,  5315,  4520,  3552,  2446,  1247};
+//
+// Range clip and shift for RGB565 output
+// input value is 0 to 255, then another 256 for overflow to FF, then 512 more for negative values wrapping around
+// Trims a few instructions off the final output stage
+//
+static const uint16_t usRangeTabR[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000, // 0
+    0x0800,0x0800,0x0800,0x0800,0x0800,0x0800,0x0800,0x0800,
+    0x1000,0x1000,0x1000,0x1000,0x1000,0x1000,0x1000,0x1000,
+    0x1800,0x1800,0x1800,0x1800,0x1800,0x1800,0x1800,0x1800,
+    0x2000,0x2000,0x2000,0x2000,0x2000,0x2000,0x2000,0x2000,
+    0x2800,0x2800,0x2800,0x2800,0x2800,0x2800,0x2800,0x2800,
+    0x3000,0x3000,0x3000,0x3000,0x3000,0x3000,0x3000,0x3000,
+    0x3800,0x3800,0x3800,0x3800,0x3800,0x3800,0x3800,0x3800,
+    0x4000,0x4000,0x4000,0x4000,0x4000,0x4000,0x4000,0x4000,
+    0x4800,0x4800,0x4800,0x4800,0x4800,0x4800,0x4800,0x4800,
+    0x5000,0x5000,0x5000,0x5000,0x5000,0x5000,0x5000,0x5000,
+    0x5800,0x5800,0x5800,0x5800,0x5800,0x5800,0x5800,0x5800,
+    0x6000,0x6000,0x6000,0x6000,0x6000,0x6000,0x6000,0x6000,
+    0x6800,0x6800,0x6800,0x6800,0x6800,0x6800,0x6800,0x6800,
+    0x7000,0x7000,0x7000,0x7000,0x7000,0x7000,0x7000,0x7000,
+    0x7800,0x7800,0x7800,0x7800,0x7800,0x7800,0x7800,0x7800,
+    0x8000,0x8000,0x8000,0x8000,0x8000,0x8000,0x8000,0x8000,
+    0x8800,0x8800,0x8800,0x8800,0x8800,0x8800,0x8800,0x8800,
+    0x9000,0x9000,0x9000,0x9000,0x9000,0x9000,0x9000,0x9000,
+    0x9800,0x9800,0x9800,0x9800,0x9800,0x9800,0x9800,0x9800,
+    0xa000,0xa000,0xa000,0xa000,0xa000,0xa000,0xa000,0xa000,
+    0xa800,0xa800,0xa800,0xa800,0xa800,0xa800,0xa800,0xa800,
+    0xb000,0xb000,0xb000,0xb000,0xb000,0xb000,0xb000,0xb000,
+    0xb800,0xb800,0xb800,0xb800,0xb800,0xb800,0xb800,0xb800,
+    0xc000,0xc000,0xc000,0xc000,0xc000,0xc000,0xc000,0xc000,
+    0xc800,0xc800,0xc800,0xc800,0xc800,0xc800,0xc800,0xc800,
+    0xd000,0xd000,0xd000,0xd000,0xd000,0xd000,0xd000,0xd000,
+    0xd800,0xd800,0xd800,0xd800,0xd800,0xd800,0xd800,0xd800,
+    0xe000,0xe000,0xe000,0xe000,0xe000,0xe000,0xe000,0xe000,
+    0xe800,0xe800,0xe800,0xe800,0xe800,0xe800,0xe800,0xe800,
+    0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800, // 256
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,0xf800,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 512
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 768
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+static const uint16_t usRangeTabG[] = {0x0000,0x0000,0x0000,0x0000,0x0020,0x0020,0x0020,0x0020, // 0
+    0x0040,0x0040,0x0040,0x0040,0x0060,0x0060,0x0060,0x0060,
+    0x0080,0x0080,0x0080,0x0080,0x00a0,0x00a0,0x00a0,0x00a0,
+    0x00c0,0x00c0,0x00c0,0x00c0,0x00e0,0x00e0,0x00e0,0x00e0,
+    0x0100,0x0100,0x0100,0x0100,0x0120,0x0120,0x0120,0x0120,
+    0x0140,0x0140,0x0140,0x0140,0x0160,0x0160,0x0160,0x0160,
+    0x0180,0x0180,0x0180,0x0180,0x01a0,0x01a0,0x01a0,0x01a0,
+    0x01c0,0x01c0,0x01c0,0x01c0,0x01e0,0x01e0,0x01e0,0x01e0,
+    0x0200,0x0200,0x0200,0x0200,0x0220,0x0220,0x0220,0x0220,
+    0x0240,0x0240,0x0240,0x0240,0x0260,0x0260,0x0260,0x0260,
+    0x0280,0x0280,0x0280,0x0280,0x02a0,0x02a0,0x02a0,0x02a0,
+    0x02c0,0x02c0,0x02c0,0x02c0,0x02e0,0x02e0,0x02e0,0x02e0,
+    0x0300,0x0300,0x0300,0x0300,0x0320,0x0320,0x0320,0x0320,
+    0x0340,0x0340,0x0340,0x0340,0x0360,0x0360,0x0360,0x0360,
+    0x0380,0x0380,0x0380,0x0380,0x03a0,0x03a0,0x03a0,0x03a0,
+    0x03c0,0x03c0,0x03c0,0x03c0,0x03e0,0x03e0,0x03e0,0x03e0,
+    0x0400,0x0400,0x0400,0x0400,0x0420,0x0420,0x0420,0x0420,
+    0x0440,0x0440,0x0440,0x0440,0x0460,0x0460,0x0460,0x0460,
+    0x0480,0x0480,0x0480,0x0480,0x04a0,0x04a0,0x04a0,0x04a0,
+    0x04c0,0x04c0,0x04c0,0x04c0,0x04e0,0x04e0,0x04e0,0x04e0,
+    0x0500,0x0500,0x0500,0x0500,0x0520,0x0520,0x0520,0x0520,
+    0x0540,0x0540,0x0540,0x0540,0x0560,0x0560,0x0560,0x0560,
+    0x0580,0x0580,0x0580,0x0580,0x05a0,0x05a0,0x05a0,0x05a0,
+    0x05c0,0x05c0,0x05c0,0x05c0,0x05e0,0x05e0,0x05e0,0x05e0,
+    0x0600,0x0600,0x0600,0x0600,0x0620,0x0620,0x0620,0x0620,
+    0x0640,0x0640,0x0640,0x0640,0x0660,0x0660,0x0660,0x0660,
+    0x0680,0x0680,0x0680,0x0680,0x06a0,0x06a0,0x06a0,0x06a0,
+    0x06c0,0x06c0,0x06c0,0x06c0,0x06e0,0x06e0,0x06e0,0x06e0,
+    0x0700,0x0700,0x0700,0x0700,0x0720,0x0720,0x0720,0x0720,
+    0x0740,0x0740,0x0740,0x0740,0x0760,0x0760,0x0760,0x0760,
+    0x0780,0x0780,0x0780,0x0780,0x07a0,0x07a0,0x07a0,0x07a0,
+    0x07c0,0x07c0,0x07c0,0x07c0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0, // 256
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,0x07e0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 512
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 768
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+static const uint16_t usRangeTabB[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000, // 0
+    0x0001,0x0001,0x0001,0x0001,0x0001,0x0001,0x0001,0x0001,
+    0x0002,0x0002,0x0002,0x0002,0x0002,0x0002,0x0002,0x0002,
+    0x0003,0x0003,0x0003,0x0003,0x0003,0x0003,0x0003,0x0003,
+    0x0004,0x0004,0x0004,0x0004,0x0004,0x0004,0x0004,0x0004,
+    0x0005,0x0005,0x0005,0x0005,0x0005,0x0005,0x0005,0x0005,
+    0x0006,0x0006,0x0006,0x0006,0x0006,0x0006,0x0006,0x0006,
+    0x0007,0x0007,0x0007,0x0007,0x0007,0x0007,0x0007,0x0007,
+    0x0008,0x0008,0x0008,0x0008,0x0008,0x0008,0x0008,0x0008,
+    0x0009,0x0009,0x0009,0x0009,0x0009,0x0009,0x0009,0x0009,
+    0x000a,0x000a,0x000a,0x000a,0x000a,0x000a,0x000a,0x000a,
+    0x000b,0x000b,0x000b,0x000b,0x000b,0x000b,0x000b,0x000b,
+    0x000c,0x000c,0x000c,0x000c,0x000c,0x000c,0x000c,0x000c,
+    0x000d,0x000d,0x000d,0x000d,0x000d,0x000d,0x000d,0x000d,
+    0x000e,0x000e,0x000e,0x000e,0x000e,0x000e,0x000e,0x000e,
+    0x000f,0x000f,0x000f,0x000f,0x000f,0x000f,0x000f,0x000f,
+    0x0010,0x0010,0x0010,0x0010,0x0010,0x0010,0x0010,0x0010,
+    0x0011,0x0011,0x0011,0x0011,0x0011,0x0011,0x0011,0x0011,
+    0x0012,0x0012,0x0012,0x0012,0x0012,0x0012,0x0012,0x0012,
+    0x0013,0x0013,0x0013,0x0013,0x0013,0x0013,0x0013,0x0013,
+    0x0014,0x0014,0x0014,0x0014,0x0014,0x0014,0x0014,0x0014,
+    0x0015,0x0015,0x0015,0x0015,0x0015,0x0015,0x0015,0x0015,
+    0x0016,0x0016,0x0016,0x0016,0x0016,0x0016,0x0016,0x0016,
+    0x0017,0x0017,0x0017,0x0017,0x0017,0x0017,0x0017,0x0017,
+    0x0018,0x0018,0x0018,0x0018,0x0018,0x0018,0x0018,0x0018,
+    0x0019,0x0019,0x0019,0x0019,0x0019,0x0019,0x0019,0x0019,
+    0x001a,0x001a,0x001a,0x001a,0x001a,0x001a,0x001a,0x001a,
+    0x001b,0x001b,0x001b,0x001b,0x001b,0x001b,0x001b,0x001b,
+    0x001c,0x001c,0x001c,0x001c,0x001c,0x001c,0x001c,0x001c,
+    0x001d,0x001d,0x001d,0x001d,0x001d,0x001d,0x001d,0x001d,
+    0x001e,0x001e,0x001e,0x001e,0x001e,0x001e,0x001e,0x001e,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f, // 256
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,0x001f,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 512
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 768
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 //
 // Helper functions for memory based images
 //
@@ -185,14 +513,11 @@ static int JPEGGetHuffTables(uint8_t *pBuf, int iLen, JPEGIMAGE *pJPEG)
     }
     return 0;
 } /* JPEGGetHuffTables() */
-/****************************************************************************
- *                                                                          *
- *  FUNCTION   : JPEGMakeHuffTables_Slow(JPEGDATA *, PILBOOL)                  *
- *                                                                          *
- *  PURPOSE    : Create the expanded Huffman tables for "slow" decode.      *
- *                                                                          *
- ****************************************************************************/
-int JPEGMakeHuffTables_Slow(JPEGDATA *pJPEG, PILBOOL bThumbnail)
+//
+// Create 11-bit lookup tables for some images where it doesn't work
+// for 10-bit tables
+//
+int JPEGMakeHuffTables_Slow(JPEGIMAGE *pJPEG, int bThumbnail)
 {
     int code, repeat, count, codestart;
     int j;
@@ -212,19 +537,19 @@ int JPEGMakeHuffTables_Slow(JPEGDATA *pJPEG, PILBOOL bThumbnail)
     // to handle any DC codes
     iMaxLength = 12; // assume DC codes can be 12-bits
     iMaxMask = 0x7f; // lower 7 bits after truncate 5 leading 1's
-    if (pJPEG->iMode == 0xc3) // create 13-bit tables for lossless mode
+    if (pJPEG->ucMode == 0xc3) // create 13-bit tables for lossless mode
     {
         iMaxLength = 13;
         iMaxMask = 0xff;
     }
     for (iTable = 0; iTable < 2; iTable++)
     {
-        if (pJPEG->ucHuffTableUsed[iTable])
+        if (pJPEG->ucHuffTableUsed & (1<<iTable))
         {
             //         pJPEG->huffdcFast[iTable] = (int *)PILIOAlloc(0x180); // short table = 128 bytes, long table = 256 bytes
-            pucShort = (unsigned char *)pJPEG->huffdcFast[iTable];
+            pucShort = (unsigned char *)&pJPEG->ucHuffDCShort[iTable*DCTSIZE*2];
             //         pJPEG->huffdc[iTable] = pJPEG->huffdcFast[iTable] + 0x20; // 0x20 longs = 128 bytes
-            pucLong = (unsigned char *)pJPEG->huffdc[iTable];
+            pucLong = (unsigned char *)&pJPEG->ucHuffDCLong[iTable*HUFF11SIZE*2];
             pBits = &pJPEG->ucHuffVals[iTable * HUFF_TABLEN];
             p = pBits;
             p += 16; // point to bit data
@@ -254,7 +579,7 @@ int JPEGMakeHuffTables_Slow(JPEGDATA *pJPEG, PILBOOL bThumbnail)
                         pucTable = &pucShort[codestart];
                     }
                     ucCode = *p++;  // get actual huffman code
-                    if (ucCode == 16 && pJPEG->iMode == 0xc3) // lossless mode
+                    if (ucCode == 16 && pJPEG->ucMode == 0xc3) // lossless mode
                     {
                         // in lossless mode, this code won't fit in 4 bits, so save it's length in the next slot
                         ucCode = 255;
@@ -262,7 +587,7 @@ int JPEGMakeHuffTables_Slow(JPEGDATA *pJPEG, PILBOOL bThumbnail)
                     }
                     // does precalculating the DC value save time on ARM?
 #ifndef USE_ARM_ASM
-                    if (ucCode != 0 && (ucCode + iBitNum) <= 6 && pJPEG->iMode != 0xc2) // we can fit the magnitude value in the code lookup (not for progressive)
+                    if (ucCode != 0 && (ucCode + iBitNum) <= 6 && pJPEG->ucMode != 0xc2) // we can fit the magnitude value in the code lookup (not for progressive)
                     {
                         int k, iLoop;
                         unsigned char ucCoeff;
@@ -311,20 +636,15 @@ int JPEGMakeHuffTables_Slow(JPEGDATA *pJPEG, PILBOOL bThumbnail)
     }
     // now do AC components (up to 2 tables of 16-bit codes)
     // We split the codes into a short table (9 bits or less) and a long table (first 5 bits are 1)
-    for (iTable = 0; iTable < 4; iTable++)
+    for (iTable = 0; iTable < 2; iTable++)
     {
-        if (pJPEG->ucHuffTableUsed[iTable+4])  // if this table is defined
+        if (pJPEG->ucHuffTableUsed & (1<<(iTable+4)))  // if this table is defined
         {
             pBits = &pJPEG->ucHuffVals[(iTable+4) * HUFF_TABLEN];
             p = pBits;
             p += 16; // point to bit data
-            //         pJPEG->huffacFast[iTable] = (int *)PILIOAlloc(0x1400); // fast table = 1024 bytes, slow = 4096
-            //         pJPEG->huffac[iTable] = pJPEG->huffacFast[iTable] + 0x100; // 0x100 longs = 1024 bytes
-            if (iTable > 0) // use other buffer
-                pShort = (unsigned short *)&pJPEG->ucAltHuff[(iTable-1)*0x4000];
-            else
-                pShort = (unsigned short *)pJPEG->huffacFast[0];
-            pLong = &pShort[0x1000]; //(unsigned short *)pJPEG->huffac[iTable*2];
+            pShort = &pJPEG->usHuffACShort[iTable*DCTSIZE];
+            pLong = &pJPEG->usHuffACLong[iTable*HUFF11SIZE];
             cc = 0; // start with a code of 0
             // construct the decode table
             for (iBitNum = 1; iBitNum <= 16; iBitNum++)
@@ -400,7 +720,7 @@ int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
     iTablesUsed = 0;
     for (j=0; j<4; j++)
     {
-        if (pJPEG->ucHuffTableUsed & (1 << j) != 0)
+        if (pJPEG->ucHuffTableUsed & (1 << j))
             iTablesUsed++;
     }
     // first do DC components (up to 4 tables of 12-bit codes)
@@ -414,9 +734,9 @@ int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
         if (pJPEG->ucHuffTableUsed && (1 << iTable))
         {
             //         pJPEG->huffdcFast[iTable] = (int *)PILIOAlloc(0x180); // short table = 128 bytes, long table = 256 bytes
-            pucShort = (unsigned char *)&pJPEG->ucHuffDC[iTable*2048];
+            pucShort = (unsigned char *)&pJPEG->ucHuffDCShort[iTable*DCTSIZE*2];
             //         pJPEG->huffdc[iTable] = pJPEG->huffdcFast[iTable] + 0x20; // 0x20 longs = 128 bytes
-            pucLong = (unsigned char *)&pJPEG->ucHuffDC[iTable*2048 + 1024];
+            pucLong = (unsigned char *)&pJPEG->ucHuffDCLong[iTable*HUFF11SIZE*2];
             pBits = &pJPEG->ucHuffVals[iTable * HUFF_TABLEN];
             p = pBits;
             p += 16; // point to bit data
@@ -504,10 +824,8 @@ int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
             pBits = &pJPEG->ucHuffVals[(iTable+4) * HUFF_TABLEN];
             p = pBits;
             p += 16; // point to bit data
-            //         pJPEG->huffacFast[iTable] = (int *)PILIOAlloc(0x1400); // fast table = 1024 bytes, slow = 4096
-            //         pJPEG->huffac[iTable] = pJPEG->huffacFast[iTable] + 0x100; // 0x100 longs = 1024 bytes
-            pShort = (unsigned short *)&pJPEG->ucHuffAC[iTable*2048];
-            pLong = (unsigned short *)&pJPEG->ucHuffAC[iTable*2048 + 1024];
+            pShort = &pJPEG->usHuffACShort[iTable*DCTSIZE];
+            pLong = &pJPEG->usHuffACLong[iTable*HUFF11SIZE];
             cc = 0; // start with a code of 0
             // construct the decode table
             for (iBitNum = 1; iBitNum <= 16; iBitNum++)
@@ -623,19 +941,193 @@ uint32_t TIFFLONG(unsigned char *p, int bMotorola)
     return l;
 } /* TIFFLONG() */
 //
+// TIFFVALUE
+// read an integer value encoded in a TIFF TAG (12-byte structure)
+// and interpret the data as big endian (Motorola) or little endian (Intel)
+//
+int TIFFVALUE(unsigned char *p, int bMotorola)
+{
+    int i, iType;
+    
+    iType = TIFFSHORT(p+2, bMotorola);
+    /* If pointer to a list of items, must be a long */
+    if (TIFFSHORT(p+4, bMotorola) > 1)
+    {
+        iType = 4;
+    }
+    switch (iType)
+    {
+        case 3: /* Short */
+            i = TIFFSHORT(p+8, bMotorola);
+            break;
+        case 4: /* Long */
+        case 7: // undefined (treat it as a long since it's usually a multibyte buffer)
+            i = TIFFLONG(p+8, bMotorola);
+            break;
+        case 6: // signed byte
+            i = (signed char)p[8];
+            break;
+        case 2: /* ASCII */
+        case 5: /* Unsigned Rational */
+        case 10: /* Signed Rational */
+            i = TIFFLONG(p+8, bMotorola);
+            break;
+        default: /* to suppress compiler warning */
+            i = 0;
+            break;
+    }
+    return i;
+    
+} /* TIFFVALUE() */
+uint8_t GetEXIFOrientation(JPEGIMAGE *pPage, int bMotorola, int iOffset)
+{
+    int iTag, iTagCount, i;
+    uint8_t c = 0, *cBuf = pPage->ucFileBuf;
+    
+    iTagCount = TIFFSHORT(&cBuf[iOffset], bMotorola);  /* Number of tags in this dir */
+    if (iTagCount < 1 || iTagCount > 256) // invalid tag count
+        return -1; /* Bad header info */
+    /*--- Search the TIFF tags ---*/
+    for (i=0; i<iTagCount; i++)
+    {
+        unsigned char *p = &cBuf[iOffset + (i*12) +2];
+        iTag = TIFFSHORT(p, bMotorola);  /* current tag value */
+        if (iTag == 274) // we're only looking for the orientation tag
+        {
+            c = TIFFVALUE(p, bMotorola);
+            i = iTagCount; // exit loop - we're done
+        }
+    }
+    return c;
+}
+int JPEGGetSOS(JPEGIMAGE *pJPEG, int *iOff)
+{
+    int16_t sLen;
+    int iOffset = *iOff;
+    int i, j;
+    uint8_t uc,c,cc;
+    uint8_t *buf = pJPEG->ucFileBuf;
+    
+    sLen = MOTOSHORT(&buf[iOffset]);
+    iOffset += 2;
+    
+    // Assume no components in this scan
+    for (i=0; i<4; i++)
+        pJPEG->JPCI[i].component_needed = 0;
+    
+    uc = buf[iOffset++]; // get number of components
+    pJPEG->ucComponentsInScan = uc;
+    sLen -= 3;
+    if (uc < 1 || uc > MAX_COMPS_IN_SCAN || sLen != (uc*2+3)) // check length of data packet
+        return 1; // error
+    for (i=0; i<uc; i++)
+    {
+        cc = buf[iOffset++];
+        c = buf[iOffset++];
+        sLen -= 2;
+        for (j=0; j<4; j++) // search for component id
+        {
+            if (pJPEG->JPCI[j].component_id == cc)
+                break;
+        }
+        if (j == 4) // error, not found
+            return 1;
+        if ((c & 0xf) > 3 || (c & 0xf0) > 0x30)
+            return 1; // bogus table numbers
+        pJPEG->JPCI[j].dc_tbl_no = c >> 4;
+        pJPEG->JPCI[j].ac_tbl_no = c & 0xf;
+        pJPEG->JPCI[j].component_needed = 1; // mark this component as being included in the scan
+    }
+    pJPEG->iScanStart = buf[iOffset++]; // Get the scan start (or lossless predictor) for this scan
+    pJPEG->iScanEnd = buf[iOffset++]; // Get the scan end for this scan
+    c = buf[iOffset++]; // successive approximation bits
+    pJPEG->cApproxBitsLow = c & 0xf; // also point transform in lossless mode
+    pJPEG->cApproxBitsHigh = c >> 4;
+    
+    *iOff = iOffset;
+    return 0;
+    
+} /* JPEGGetSOS() */
+//
+// Remove markers from the data stream to allow faster decode
+// Stuffed zeros and restart interval markers aren't needed to properly decode
+// the data, but they make reading VLC data slower, so I pull them out first
+//
+static int JPEGFilter(uint8_t *pBuf, uint8_t *d, int iLen, uint8_t *bFF)
+{
+    // since we have the entire jpeg buffer in memory already, we can just change it in place
+    unsigned char c, *s, *pEnd, *pStart;
+    
+    pStart = d;
+    s = pBuf;
+    pEnd = &s[iLen-1]; // stop just shy of the end to not miss a final marker/stuffed 0
+    if (*bFF) // last byte was a FF, check the next one
+    {
+        if (s[0] == 0) // stuffed 0, keep the FF
+            *d++ = 0xff;
+        s++;
+        *bFF = 0;
+    }
+    while (s < pEnd)
+    {
+        c = *d++ = *s++;
+        if (c == 0xff) // marker or stuffed zeros?
+        {
+            if (s[0] != 0) // it's a marker, skip both
+            {
+                d--;
+            }
+            s++; // for stuffed 0's, store the FF, skip the 00
+        }
+    }
+    if (s == pEnd) // need to test the last byte
+    {
+        c = s[0];
+        if (c == 0xff) // last byte is FF, take care of it next time through
+            *bFF = 1; // take care of it next time through
+        else
+            *d++ = c; // nope, just store it
+    }
+    return (int)(d-pStart); // filtered output length
+} /* JPEGFilter() */
+//
+// Read and filter more VLC data for decoding
+//
+static void JPEGGetMoreData(JPEGIMAGE *pPage)
+{
+    // move any existing data down
+    if ((pPage->iVLCSize - pPage->iVLCOff) >= FILE_HIGHWATER)
+        return; // buffer is already full; no need to read more data
+    if (pPage->iVLCOff != 0)
+    {
+      memcpy(pPage->ucFileBuf, &pPage->ucFileBuf[pPage->iVLCOff], pPage->iVLCSize - pPage->iVLCOff);
+      pPage->iVLCSize -= pPage->iVLCOff;
+      pPage->iVLCOff = 0;
+    }
+    if (pPage->JPEGFile.iPos < pPage->JPEGFile.iSize && pPage->iVLCSize < FILE_HIGHWATER)
+    {
+        int i;
+        // Try to read enough to fill the buffer
+        i = (*pPage->pfnRead)(&pPage->JPEGFile, &pPage->ucFileBuf[pPage->iVLCSize], FILE_BUF_SIZE - pPage->iVLCSize); // max length we can read
+        // Filter out the markers
+        pPage->iVLCSize += JPEGFilter(&pPage->ucFileBuf[pPage->iVLCSize], &pPage->ucFileBuf[pPage->iVLCSize], i, &pPage->ucFF);
+    }
+} /* JPEGGetMoreData() */
+
+//
 // Parse the JPEG header, gather necessary info to decode the image
 // Returns 1 for success, 0 for failure
 //
 static int JPEGParseInfo(JPEGIMAGE *pPage)
 {
-    int iBytesRead, iNumComponents;
+    int iBytesRead;
     int i, iOffset, iTableOffset;
     uint8_t ucTable, *s = pPage->ucFileBuf;
     uint16_t usMarker, usLen;
     int iFilePos = 0;
     
     iBytesRead = (*pPage->pfnRead)(&pPage->JPEGFile, s, FILE_BUF_SIZE);
-    if (iBytesRead < FILE_BUF_SIZE) // a JPEG file this tiny? probably bad
+    if (iBytesRead < 256) // a JPEG file this tiny? probably bad
         return 0;
     iFilePos += iBytesRead;
     if (MOTOSHORT(pPage->ucFileBuf) != 0xffd8)
@@ -681,24 +1173,23 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
             case 0xffc3:
                 return 0; // currently unsupported modes
                 
-	    case 0xffe1: // App1 (EXIF?)
-		if (s[iOffset+2] == 'E' && s[iOffset+3] == 'x' && (s[iOffset+8] == 'M' || s[iOffset+8] == 'I')) // the EXIF data we want
-		{
-		    pPage->iEXIF = iFilePos + iOffset + 8; // start of TIFF file
-		    // Get the orientation value (if present)
-		    int bMotorola = (s[iOffset+8] == 'M');
-		    int IFD = TIFFLONG(&s[iOffset+12], bMotorola);
-		    printf("TIFF IFD = %d\n");
-		    // TIFFInfo(pPage, bMotorola, IFD);
-		}
-		break;
+            case 0xffe1: // App1 (EXIF?)
+                if (s[iOffset+2] == 'E' && s[iOffset+3] == 'x' && (s[iOffset+8] == 'M' || s[iOffset+8] == 'I')) // the EXIF data we want
+                {
+                    pPage->iEXIF = iFilePos + iOffset + 8; // start of TIFF file
+                    // Get the orientation value (if present)
+                    int bMotorola = (s[iOffset+8] == 'M');
+                    int IFD = TIFFLONG(&s[iOffset+12], bMotorola);
+                    pPage->ucOrientation = GetEXIFOrientation(pPage, bMotorola, IFD+iOffset+8);
+                }
+                break;
             case 0xffc0: // SOFx - start of frame
                 pPage->ucMode = (uint8_t)usMarker;
                 pPage->ucBpp = s[iOffset+2]; // bits per sample
                 pPage->iHeight = MOTOSHORT(&s[iOffset+3]);
                 pPage->iWidth = MOTOSHORT(&s[iOffset+5]);
-                iNumComponents = s[iOffset+7];
-                pPage->ucBpp = pPage->ucBpp * iNumComponents; /* Bpp = number of components * bits per sample */
+                pPage->ucNumComponents = s[iOffset+7];
+                pPage->ucBpp = pPage->ucBpp * pPage->ucNumComponents; /* Bpp = number of components * bits per sample */
                 pPage->ucSubSample = s[iOffset+9]; // subsampling option for the second color component
                 pPage->ucSubSample = (pPage->ucSubSample & 0xf) | (pPage->ucSubSample >> 2);
                 break;
@@ -742,46 +1233,56 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
                     }
                 }
                 break;
-
-        }
+        } // switch on JPEG marker
         iOffset += usLen;
     } // while
     if (usMarker == 0xffda) // start of image
     {
-        JPEGMakeHuffTables(pPage, 0); //int bThumbnail)
+        JPEGGetSOS(pPage, &iOffset); // get Start-Of-Scan info for decoding
+        JPEGMakeHuffTables(pPage, 0); //int bThumbnail) DEBUG
+        // Now the offset points to the start of compressed data
+        i = JPEGFilter(&pPage->ucFileBuf[iOffset], pPage->ucFileBuf, iBytesRead-iOffset, &pPage->ucFF);
+        pPage->iVLCOff = 0;
+        pPage->iVLCSize = i;
+        JPEGGetMoreData(pPage); // read more VLC data
         return 1;
     }
     return 0;
 } /* JPEGParseInfo() */
 //
-// Filter more VLC data for decoding
-// returns 1 to signify more data available for this image
-// 0 indicates there is no more data
+// Fix and reorder the quantization table for faster decoding.*
 //
-static void JPEGGetMoreData(JPEGIMAGE *pPage)
+static void JPEGFixQuantD(JPEGIMAGE *pJPEG)
 {
-    unsigned char c = 1;
-    // move any existing data down
-    if ((pPage->iVLCSize - pPage->iVLCOff) >= VLC_HIGHWATER)
-        return; // buffer is already full; no need to read more data
-    if (pPage->iVLCOff != 0)
+    int iTable, iTableOffset;
+    signed short sTemp[DCTSIZE];
+    int i;
+    uint16_t *p;
+    
+    for (iTable=0; iTable<pJPEG->ucNumComponents; iTable++)
     {
-      memcpy(pPage->ucVLC, &pPage->ucVLC[pPage->iVLCOff], pPage->iVLCSize - pPage->iVLCOff);
-      pPage->iVLCSize -= pPage->iVLCOff;
-      pPage->iVLCOff = 0;
+        iTableOffset = iTable * DCTSIZE;
+        p = (uint16_t *)&pJPEG->sQuantTable[iTableOffset];
+        for (i=0; i<DCTSIZE; i++)
+            sTemp[i] = p[cZigZag[i]];
+        memcpy(&pJPEG->sQuantTable[iTableOffset], sTemp, DCTSIZE*sizeof(short)); // copy back to original spot
+        
+        // Prescale for DCT multiplication
+        p = (uint16_t *)&pJPEG->sQuantTable[iTableOffset];
+        for (i=0; i<DCTSIZE; i++)
+        {
+            p[i] = (uint16_t)((p[i] * iScaleBits[i]) >> 12);
+        }
     }
-    while (c && pPage->JPEGFile.iPos < pPage->JPEGFile.iSize && pPage->iVLCSize < VLC_HIGHWATER)
-    {
-        (*pPage->pfnRead)(&pPage->JPEGFile, &c, 1); // current length
-        (*pPage->pfnRead)(&pPage->JPEGFile, &pPage->ucVLC[pPage->iVLCSize], c);
-        pPage->iVLCSize += c;
-    }
-} /* JPEGGetMoreData() */
+} /* JPEGFixQuantD() */
 
 //
 // Decode the image
 //
-static int DecodeJPEG(JPEGIMAGE *pImage, int iOptions)
+static int DecodeJPEG(JPEGIMAGE *pJPEG, int iOptions)
 {
+    // reorder and fix the quantization table for decoding
+    JPEGFixQuantD(pJPEG);
+
     return 0;
 } /* DecodeJPEG() */

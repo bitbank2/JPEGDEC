@@ -20,12 +20,13 @@
 //
 
 /* Defines and variables */
-#define VLC_BUF_SIZE 2048
-#define VLC_HIGHWATER 1536
+#define FILE_HIGHWATER 1536
 #define FILE_BUF_SIZE 2048
 #define HUFF_TABLEN  273
-#define HUFF_EXPANDED_SIZE (2048+64)
+#define HUFF11SIZE (1<<11)
 #define DCTSIZE 64
+#define MAX_MCU_COUNT 6
+#define MAX_COMPS_IN_SCAN 4
 
 // Decoder options
 #define JPEG_AUTO_ROTATE 1
@@ -63,6 +64,42 @@ typedef void (JPEG_DRAW_CALLBACK)(JPEGDRAW *pDraw);
 typedef void * (JPEG_OPEN_CALLBACK)(char *szFilename, int32_t *pFileSize);
 typedef void (JPEG_CLOSE_CALLBACK)(void *pHandle);
 
+/* JPEG color component info */
+typedef struct _jpegcompinfo
+{
+// These values are fixed over the whole image
+// For compression, they must be supplied by the user interface
+// for decompression, they are read from the SOF marker.
+unsigned char component_needed;  /*  do we need the value of this component? */
+unsigned char component_id;     /* identifier for this component (0..255) */
+unsigned char component_index;  /* its index in SOF or cinfo->comp_info[] */
+unsigned char h_samp_factor;    /* horizontal sampling factor (1..4) */
+unsigned char v_samp_factor;    /* vertical sampling factor (1..4) */
+unsigned char quant_tbl_no;     /* quantization table selector (0..3) */
+// These values may vary between scans
+// For compression, they must be supplied by the user interface
+// for decompression, they are read from the SOS marker.
+unsigned char dc_tbl_no;        /* DC entropy table selector (0..3) */
+unsigned char ac_tbl_no;        /* AC entropy table selector (0..3) */
+// These values are computed during compression or decompression startup
+int true_comp_width;  /* component's image width in samples */
+int true_comp_height; /* component's image height in samples */
+// the above are the logical dimensions of the downsampled image
+// These values are computed before starting a scan of the component
+int MCU_width;        /* number of blocks per MCU, horizontally */
+int MCU_height;       /* number of blocks per MCU, vertically */
+int MCU_blocks;       /* MCU_width * MCU_height */
+int downsampled_width; /* image width in samples, after expansion */
+int downsampled_height; /* image height in samples, after expansion */
+// the above are the true_comp_xxx values rounded up to multiples of
+// the MCU dimensions; these are the working dimensions of the array
+// as it is passed through the DCT or IDCT step.  NOTE: these values
+// differ depending on whether the component is interleaved or not!!
+// This flag is used only for decompression.  In cases where some of the
+// components will be ignored (eg grayscale output from YCbCr image),
+// we can skip IDCT etc. computations for the unused components.
+} JPEGCOMPINFO;
+
 //
 // our private structure to hold a GIF image decode state
 //
@@ -71,6 +108,8 @@ typedef struct jpeg_image_tag
     int iWidth, iHeight;
     uint8_t ucBpp, ucSubSample, ucLittleEndian, ucHuffTableUsed;
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
+    uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
+    uint8_t iScanStart, iScanEnd, ucFF, ucNumComponents;
     int iEXIF; // Offset to EXIF 'TIFF' file
     int iVLCOff; // current VLC data offset
     int iVLCSize; // current quantity of data in the VLC buffer
@@ -80,15 +119,17 @@ typedef struct jpeg_image_tag
     JPEG_DRAW_CALLBACK *pfnDraw;
     JPEG_OPEN_CALLBACK *pfnOpen;
     JPEG_CLOSE_CALLBACK *pfnClose;
+    JPEGCOMPINFO JPCI[MAX_COMPS_IN_SCAN]; /* Max color components */
     JPEGFILE JPEGFile;
-    uint16_t usMCUBuf[16*16]; // current MCU
-    int16_t sQuantTable[DCTSIZE*2]; // quantization tables
+    uint16_t usPixels[16*16]; // current MCU pixels
+    uint16_t usMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
+    int16_t sQuantTable[DCTSIZE*4]; // quantization tables
     uint8_t ucHuffVals[HUFF_TABLEN*8];
     uint8_t ucFileBuf[FILE_BUF_SIZE]; // holds temp data and pixel stack
-    uint8_t ucVLC[VLC_BUF_SIZE];
-    uint8_t ucHuffDC[4096];
-    uint8_t ucHuffAC[4096];
-    unsigned short usHuffTable[4096];
+    uint8_t ucHuffDCShort[DCTSIZE * 2]; // up to 2 'short' tables
+    uint8_t ucHuffDCLong[HUFF11SIZE * 2]; // up to 2 'long' tables
+    uint16_t usHuffACShort[DCTSIZE * 2];
+    uint16_t usHuffACLong[HUFF11SIZE * 2];
 } JPEGIMAGE;
 
 //

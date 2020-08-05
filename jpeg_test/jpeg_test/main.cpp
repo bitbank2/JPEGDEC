@@ -7,7 +7,7 @@
 //
 #include "JPEGDEC.h"
 
-#include "../../test_images/sciopero.h"
+#include "../../test_images/f6t.h"
 
 JPEGDEC jpeg;
 
@@ -17,13 +17,18 @@ void JPEGDraw(JPEGDRAW *pDraw)
 
 int main(int argc, const char * argv[]) {
 
+    for (int i=0; i<256; i++)
+    {
+        printf("0x%04x,", (i>>3));
+        if ((i & 7) == 7)
+            printf("\n");
+    }
     printf("Starting JPEG decoder...\n");
-    jpeg.begin(BIG_ENDIAN_PIXELS);
-    if (jpeg.open((uint8_t *)sciopero, sizeof(sciopero), JPEGDraw))
+    if (jpeg.open((uint8_t *)f6t, sizeof(f6t), JPEGDraw))
     {
         printf("Successfully opened JPEG\n");
-        printf("Image size: %d x %d\n", jpeg.getWidth(), jpeg.getHeight());
-        if (jpeg.decode())
+        printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
+        if (jpeg.decode(0))
         {
             printf("Successfully decoded image\n");
         }
