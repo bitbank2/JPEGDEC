@@ -24,6 +24,7 @@
 #define FILE_BUF_SIZE 2048
 #define HUFF_TABLEN  273
 #define HUFF11SIZE (1<<11)
+#define DC_TABLE_SIZE 1024
 #define DCTSIZE 64
 #define MAX_MCU_COUNT 6
 #define MAX_COMPS_IN_SCAN 4
@@ -37,9 +38,23 @@
 #define JPEG_EXIF_THUMBNAIL 32
 #define JPEG_GRAYSCALE 64
 
+#define MCU0 (DCTSIZE * 0)
+#define MCU1 (DCTSIZE * 1)
+#define MCU2 (DCTSIZE * 2)
+#define MCU3 (DCTSIZE * 3)
+#define MCU4 (DCTSIZE * 4)
+#define MCU5 (DCTSIZE * 5)
+
 // RGB565 pixel byte order
 #define BIG_ENDIAN_PIXELS 0
 #define LITTLE_ENDIAN_PIXELS 1
+
+typedef struct buffered_bits
+{
+unsigned char *pBuf; // buffer pointer
+uint32_t ulBits; // buffered bits
+uint32_t ulBitOff; // current bit offset
+} BUFFERED_BITS;
 
 typedef struct jpeg_file_tag
 {
@@ -110,10 +125,12 @@ typedef struct jpeg_image_tag
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
     uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
     uint8_t iScanStart, iScanEnd, ucFF, ucNumComponents;
+    uint8_t ucACTable, ucDCTable, ucMaxACCol, ucMaxACRow;
     int iEXIF; // Offset to EXIF 'TIFF' file
+    int iOptions;
     int iVLCOff; // current VLC data offset
     int iVLCSize; // current quantity of data in the VLC buffer
-    int iResInterval;
+    int iResInterval, iResCount; // restart interval
     JPEG_READ_CALLBACK *pfnRead;
     JPEG_SEEK_CALLBACK *pfnSeek;
     JPEG_DRAW_CALLBACK *pfnDraw;
@@ -121,15 +138,14 @@ typedef struct jpeg_image_tag
     JPEG_CLOSE_CALLBACK *pfnClose;
     JPEGCOMPINFO JPCI[MAX_COMPS_IN_SCAN]; /* Max color components */
     JPEGFILE JPEGFile;
+    BUFFERED_BITS bb;
     uint16_t usPixels[16*16]; // current MCU pixels
-    uint16_t usMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
+    int16_t sMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
     int16_t sQuantTable[DCTSIZE*4]; // quantization tables
     uint8_t ucHuffVals[HUFF_TABLEN*8];
     uint8_t ucFileBuf[FILE_BUF_SIZE]; // holds temp data and pixel stack
-    uint8_t ucHuffDCShort[DCTSIZE * 2]; // up to 2 'short' tables
-    uint8_t ucHuffDCLong[HUFF11SIZE * 2]; // up to 2 'long' tables
-    uint16_t usHuffACShort[DCTSIZE * 2];
-    uint16_t usHuffACLong[HUFF11SIZE * 2];
+    uint8_t ucHuffDC[DC_TABLE_SIZE * 2]; // up to 2 'short' tables
+    uint16_t usHuffAC[HUFF11SIZE * 2];
 } JPEGIMAGE;
 
 //

@@ -17,12 +17,6 @@ void JPEGDraw(JPEGDRAW *pDraw)
 
 int main(int argc, const char * argv[]) {
 
-    for (int i=0; i<256; i++)
-    {
-        printf("0x%04x,", (i>>3));
-        if ((i & 7) == 7)
-            printf("\n");
-    }
     printf("Starting JPEG decoder...\n");
     if (jpeg.open((uint8_t *)f6t, sizeof(f6t), JPEGDraw))
     {
