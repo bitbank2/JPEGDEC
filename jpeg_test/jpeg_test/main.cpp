@@ -7,8 +7,9 @@
 //
 #include "JPEGDEC.h"
 
-#include "../../test_images/f6t.h"
-#include "../../test_images/gray_road.h"
+//#include "../../test_images/f6t.h"
+//#include "../../test_images/gray_road.h"
+#include "../../test_images/st_peters.h"
 
 JPEGDEC jpeg;
 
@@ -19,6 +20,8 @@ void JPEGDraw(JPEGDRAW *pDraw)
 
 int main(int argc, const char * argv[]) {
 
+    printf("jpeg structure size = %d\n", sizeof(JPEGIMAGE));
+    
 #ifdef BOGUS
     int i;
     uint8_t ucRangeTable[1024];
@@ -44,15 +47,18 @@ int main(int argc, const char * argv[]) {
     
     printf("Starting JPEG decoder...\n");
 //    if (jpeg.open((uint8_t *)f6t, sizeof(f6t), JPEGDraw))
-    if (jpeg.open((uint8_t *)gray_road, sizeof(gray_road), JPEGDraw))
+    for (int i=0; i<1000; i++)
+    {
+    if (jpeg.open((uint8_t *)st_peters, sizeof(st_peters), JPEGDraw))
     {
 //        printf("Successfully opened JPEG\n");
-//        printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
+//        printf("Image size: %d x %d, orientation: %d, bpp: %d, subsample: 0x%02x\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp(), jpeg.getSubSample());
         if (jpeg.decode(0))
         {
 //            printf("Successfully decoded image\n");
         }
         jpeg.close();
     }
+    } // for i
     return 0;
 }

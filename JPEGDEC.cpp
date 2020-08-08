@@ -133,7 +133,7 @@ static const uint8_t ucRangeTable[] = {0x80,0x81,0x82,0x83,0x84,0x85,0x86,0x87,0
     0x60,0x61,0x62,0x63,0x64,0x65,0x66,0x67,0x68,0x69,0x6a,0x6b,0x6c,0x6d,0x6e,0x6f,
     0x70,0x71,0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7a,0x7b,0x7c,0x7d,0x7e,0x7f};
 
-static const uint16_t usRangeTabGray[] = {0x0000,0x0000,0x0000,0x0000,0x0020,0x0020,0x0020,0x0020, // 0
+static const uint16_t usRangeTableGray[] = {0x0000,0x0000,0x0000,0x0000,0x0020,0x0020,0x0020,0x0020, // 0
     0x0841,0x0841,0x0841,0x0841,0x0861,0x0861,0x0861,0x0861,
     0x1082,0x1082,0x1082,0x1082,0x10a2,0x10a2,0x10a2,0x10a2,
     0x18c3,0x18c3,0x18c3,0x18c3,0x18e3,0x18e3,0x18e3,0x18e3,
@@ -231,7 +231,7 @@ static const uint16_t usRangeTabGray[] = {0x0000,0x0000,0x0000,0x0000,0x0020,0x0
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 
-static const uint16_t usRangeTabR[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000, // 0
+static const uint16_t usRangeTableR[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000, // 0
     0x0800,0x0800,0x0800,0x0800,0x0800,0x0800,0x0800,0x0800,
     0x1000,0x1000,0x1000,0x1000,0x1000,0x1000,0x1000,0x1000,
     0x1800,0x1800,0x1800,0x1800,0x1800,0x1800,0x1800,0x1800,
@@ -327,7 +327,7 @@ static const uint16_t usRangeTabR[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x0000
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-static const uint16_t usRangeTabG[] = {0x0000,0x0000,0x0000,0x0000,0x0020,0x0020,0x0020,0x0020, // 0
+static const uint16_t usRangeTableG[] = {0x0000,0x0000,0x0000,0x0000,0x0020,0x0020,0x0020,0x0020, // 0
     0x0040,0x0040,0x0040,0x0040,0x0060,0x0060,0x0060,0x0060,
     0x0080,0x0080,0x0080,0x0080,0x00a0,0x00a0,0x00a0,0x00a0,
     0x00c0,0x00c0,0x00c0,0x00c0,0x00e0,0x00e0,0x00e0,0x00e0,
@@ -423,7 +423,7 @@ static const uint16_t usRangeTabG[] = {0x0000,0x0000,0x0000,0x0000,0x0020,0x0020
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-static const uint16_t usRangeTabB[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000, // 0
+static const uint16_t usRangeTableB[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000, // 0
     0x0001,0x0001,0x0001,0x0001,0x0001,0x0001,0x0001,0x0001,
     0x0002,0x0002,0x0002,0x0002,0x0002,0x0002,0x0002,0x0002,
     0x0003,0x0003,0x0003,0x0003,0x0003,0x0003,0x0003,0x0003,
@@ -1288,7 +1288,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
     int iBytesRead;
     int i, iOffset, iTableOffset;
     uint8_t ucTable, *s = pPage->ucFileBuf;
-    uint16_t usMarker, usLen;
+    uint16_t usMarker, usLen = 0;
     int iFilePos = 0;
     
     iBytesRead = (*pPage->pfnRead)(&pPage->JPEGFile, s, FILE_BUF_SIZE);
@@ -1359,8 +1359,22 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
                     pPage->ucSubSample = 0; // use this to differentiate from color 1:1
                 else
                 {
-                    pPage->ucSubSample = s[iOffset+11]; // subsampling option for the second color component
-                    pPage->ucSubSample = (pPage->ucSubSample & 0xf) | (pPage->ucSubSample >> 2);
+                    usLen -= 8;
+                    iOffset += 8;
+//                    pPage->ucSubSample = s[iOffset+9]; // subsampling option for the second color component
+                    for (i=0; i<pPage->ucNumComponents; i++)
+                    {
+                        uint8_t ucSamp;
+                        pPage->JPCI[i].component_id = s[iOffset++];
+                        pPage->JPCI[i].component_index = (unsigned char)i;
+                        ucSamp = s[iOffset++]; // get the h+v sampling factor
+                        if (i == 0) // Y component?
+                            pPage->ucSubSample = ucSamp;
+                        pPage->JPCI[i].h_samp_factor = ucSamp >> 4;
+                        pPage->JPCI[i].v_samp_factor = ucSamp & 0xf;
+                        pPage->JPCI[i].quant_tbl_no = s[iOffset++]; // quantization table number
+                        usLen -= 3;
+                    }
                 }
                 break;
             case 0xffdd: // Restart Interval
@@ -1408,6 +1422,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
     } // while
     if (usMarker == 0xffda) // start of image
     {
+        iOffset -= usLen;
         JPEGGetSOS(pPage, &iOffset); // get Start-Of-Scan info for decoding
         JPEGMakeHuffTables(pPage, 0); //int bThumbnail) DEBUG
         // Now the offset points to the start of compressed data
@@ -1902,15 +1917,194 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int y)
         for (j=0; j<xcount; j++)
         {
             uint8_t c = *pSrc++;
-            uint16_t pix = __builtin_bswap16(usRangeTabGray[c]);
+            uint16_t pix = __builtin_bswap16(usRangeTableGray[c]);
             *usDest++ = pix;
         }
     }
     (*pJPEG->pfnDraw)(&jd);
 } /* JPEGPutMCUGray() */
+
+void JPEGPixel(uint16_t *pDest, int iY, int iCb, int iCr)
+{
+    int iCBB, iCBG, iCRG, iCRR;
+    unsigned short usPixel;
+    
+    iCBB = 7258  * (iCb-0x80);
+    iCBG = -1409 * (iCb-0x80);
+    iCRG = -2925 * (iCr-0x80);
+    iCRR = 5742  * (iCr-0x80);
+    usPixel = usRangeTableB[((iCBB + iY) >> 12) & 0x3ff]; // blue pixel
+    usPixel |= usRangeTableG[((iCBG + iCRG + iY) >> 12) & 0x3ff]; // green pixel
+    usPixel |= usRangeTableR[((iCRR + iY) >> 12) & 0x3ff]; // red pixel
+    pDest[0] = __builtin_bswap16(usPixel);
+} /* JPEGPixel() */
+
+void JPEGPixel2(uint16_t *pDest, int iY1, int iY2, int iCb, int iCr)
+{
+    int iCBB, iCBG, iCRG, iCRR;
+    uint32_t ulPixel1, ulPixel2;
+    
+    iCBB = 7258  * (iCb-0x80);
+    iCBG = -1409 * (iCb-0x80);
+    iCRG = -2925 * (iCr-0x80);
+    iCRR = 5742  * (iCr-0x80);
+    ulPixel1 = usRangeTableB[((iCBB + iY1) >> 12) & 0x3ff]; // blue pixel
+    ulPixel1 |= usRangeTableG[((iCBG + iCRG + iY1) >> 12) & 0x3ff]; // green pixel
+    ulPixel1 |= usRangeTableR[((iCRR + iY1) >> 12) & 0x3ff]; // red pixel
+    
+    ulPixel2 = usRangeTableB[((iCBB + iY2) >> 12) & 0x3ff]; // blue pixel
+    ulPixel2 |= usRangeTableG[((iCBG + iCRG + iY2) >> 12) & 0x3ff]; // green pixel
+    ulPixel2 |= usRangeTableR[((iCRR + iY2) >> 12) & 0x3ff]; // red pixel
+    *(uint32_t *)&pDest[0] = __builtin_bswap16(ulPixel1) | (__builtin_bswap16(ulPixel2)<<16);
+} /* JPEGPixel2() */
+
 void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int y)
 {
+    uint32_t Cr,Cb;
+    signed int Y1, Y2, Y3, Y4;
+    int iRow, iCol, iXCount1, iXCount2, iYCount;
+    unsigned char *pY, *pCr, *pCb;
+    int bUseOdd1, bUseOdd2; // special case where 24bpp odd sized image can clobber first column
+    uint16_t *pOutput = pJPEG->usPixels;
+    int lsize = 16;
+    JPEGDRAW jd;
+
+    pY  = (unsigned char *)&pJPEG->sMCUs[0*DCTSIZE];
+    pCb = (unsigned char *)&pJPEG->sMCUs[4*DCTSIZE];
+    pCr = (unsigned char *)&pJPEG->sMCUs[5*DCTSIZE];
     
+    /* Convert YCC pixels into RGB pixels and store in output image */
+    iYCount = 4;
+    bUseOdd1 = bUseOdd2 = 1; // assume odd column can be used
+    if ((x+15) >= pJPEG->iWidth)
+    {
+        iCol = (((pJPEG->iWidth & 15)+1) >> 1);
+        if (iCol >= 4)
+        {
+            iXCount1 = 4;
+            iXCount2 = iCol-4;
+            if (pJPEG->iWidth & 1 && (iXCount2 * 2) + 8 + (x * 16) > pJPEG->iWidth)
+                bUseOdd2 = 0;
+        }
+        else
+        {
+            iXCount1 = iCol;
+            iXCount2 = 0;
+            if (pJPEG->iWidth & 1 && (iXCount1 * 2) + (x * 16) > pJPEG->iWidth)
+                bUseOdd1 = 0;
+        }
+    }
+    else
+        iXCount1 = iXCount2 = 4;
+    for (iRow=0; iRow<iYCount; iRow++) // up to 4 rows to do
+    {
+        for (iCol=0; iCol<iXCount1; iCol++) // up to 4 cols to do
+        {
+            // for top left block
+            Y1 = pY[iCol*2];
+            Y2 = pY[iCol*2+1];
+            Y3 = pY[iCol*2+8];
+            Y4 = pY[iCol*2+9];
+            Y1 <<= 12;  // scale to level of conversion table
+            Y2 <<= 12;
+            Y3 <<= 12;
+            Y4 <<= 12;
+            Cb = pCb[iCol];
+            Cr = pCr[iCol];
+            if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
+            {
+                JPEGPixel2(pOutput + (iCol<<1), Y1, Y2, Cb, Cr);
+                JPEGPixel2(pOutput+lsize + (iCol<<1), Y3, Y4, Cb, Cr);
+            }
+            else
+            {
+                JPEGPixel(pOutput + (iCol<<1), Y1, Cb, Cr);
+                JPEGPixel(pOutput+lsize + (iCol<<1), Y3, Cb, Cr);
+            }
+            // for top right block
+            if (iCol < iXCount2)
+            {
+                Y1 = pY[iCol*2+DCTSIZE*2];
+                Y2 = pY[iCol*2+1+DCTSIZE*2];
+                Y3 = pY[iCol*2+8+DCTSIZE*2];
+                Y4 = pY[iCol*2+9+DCTSIZE*2];
+                Y1 <<= 12;  // scale to level of conversion table
+                Y2 <<= 12;
+                Y3 <<= 12;
+                Y4 <<= 12;
+                Cb = pCb[iCol+4];
+                Cr = pCr[iCol+4];
+                if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
+                {
+                    JPEGPixel2(pOutput + 8+(iCol<<1), Y1, Y2, Cb, Cr);
+                    JPEGPixel2(pOutput+lsize + 8+(iCol<<1), Y3, Y4, Cb, Cr);
+                }
+                else
+                {
+                    JPEGPixel(pOutput+ 8+(iCol<<1), Y1, Cb, Cr);
+                    JPEGPixel(pOutput+lsize+ 8+(iCol<<1), Y3, Cb, Cr);
+                }
+            }
+            // for bottom left block
+            Y1 = pY[iCol*2+DCTSIZE*4];
+            Y2 = pY[iCol*2+1+DCTSIZE*4];
+            Y3 = pY[iCol*2+8+DCTSIZE*4];
+            Y4 = pY[iCol*2+9+DCTSIZE*4];
+            Y1 <<= 12;  // scale to level of conversion table
+            Y2 <<= 12;
+            Y3 <<= 12;
+            Y4 <<= 12;
+            Cb = pCb[iCol+32];
+            Cr = pCr[iCol+32];
+            if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
+            {
+                JPEGPixel2(pOutput+lsize*8+ (iCol<<1), Y1, Y2, Cb, Cr);
+                JPEGPixel2(pOutput+lsize*9+ (iCol<<1), Y3, Y4, Cb, Cr);
+            }
+            else
+            {
+                JPEGPixel(pOutput+lsize*8+ (iCol<<1), Y1, Cb, Cr);
+                JPEGPixel(pOutput+lsize*9+ (iCol<<1), Y3, Cb, Cr);
+            }
+            // for bottom right block
+            if (iCol < iXCount2)
+            {
+                Y1 = pY[iCol*2+DCTSIZE*6];
+                Y2 = pY[iCol*2+1+DCTSIZE*6];
+                Y3 = pY[iCol*2+8+DCTSIZE*6];
+                Y4 = pY[iCol*2+9+DCTSIZE*6];
+                Y1 <<= 12;  // scale to level of conversion table
+                Y2 <<= 12;
+                Y3 <<= 12;
+                Y4 <<= 12;
+                Cb = pCb[iCol+36];
+                Cr = pCr[iCol+36];
+                if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
+                {
+                    JPEGPixel2(pOutput+lsize*8+ 8+(iCol<<1), Y1, Y2, Cb, Cr);
+                    JPEGPixel2(pOutput+lsize*9+ 8+(iCol<<1), Y3, Y4, Cb, Cr);
+                }
+                else
+                {
+                    JPEGPixel(pOutput+lsize*8+ 8+(iCol<<1), Y1, Cb, Cr);
+                    JPEGPixel(pOutput+lsize*9+ 8+(iCol<<1), Y3, Cb, Cr);
+                }
+            }
+        } // for each column
+        pY += 16; // skip to next line of source pixels
+        pCb += 8;
+        pCr += 8;
+        pOutput += lsize*2;
+    }
+    
+    jd.iBpp = 24;
+    jd.iHeight = 16;
+    jd.iWidth = 16;
+    jd.pPixels = pJPEG->usPixels;
+    jd.x = x;
+    jd.y = y;
+    (*pJPEG->pfnDraw)(&jd);
+
 } /* JPEGPutMCU22() */
 //
 // Decode the image
@@ -1997,7 +2191,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG, int iOptions)
             pJPEG->ucDCTable = cDCTable0;
             // do the first luminance component
             iErr = JPEGDecodeMCU(pJPEG, iLum0, &iDCPred0);
-            if (0) //pJPEG->ucMaxACCol == 0) // no AC components, save some time
+            if (pJPEG->ucMaxACCol == 0) // no AC components, save some time
             {
                 pl = (uint32_t *)&pJPEG->sMCUs[iLum0];
                 c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
@@ -2008,8 +2202,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG, int iOptions)
             }
             else
             {
-//                JPEGIDCT(pJPEG, iLum0, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
-                JPEGIDCT(pJPEG, iLum0, pJPEG->JPCI[0].quant_tbl_no, 0xffff); // first quantization table
+                JPEGIDCT(pJPEG, iLum0, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
             }
             // do the second luminance component
             if (pJPEG->ucSubSample > 0x11) // subsampling

@@ -1,8 +1,9 @@
 //#include <SD.h>
 #include <bb_spi_lcd.h>
 #include "JPEGDEC.h"
-#include "test_images/gray_road.h"
+//#include "test_images/gray_road.h"
 //#include "test_images/f6t.h"
+#include "test_images/st_peters.h"
 
 // Janzen Hub
 #define CS_PIN 4
@@ -23,10 +24,11 @@ static uint8_t *ucTXBuf;
 // pixel drawing callback
 void drawMCU(JPEGDRAW *pDraw)
 {
+  int iCount = pDraw->iWidth * pDraw->iHeight;
   spilcdSetPosition(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight, 1);
   spilcdWaitDMA();
-  memcpy(ucTXBuf, pDraw->pPixels, 64*sizeof(uint16_t));
-  spilcdWriteDataDMA(64*2);  
+  memcpy(ucTXBuf, pDraw->pPixels, iCount*sizeof(uint16_t));
+  spilcdWriteDataDMA(iCount*2);  
 } /* drawMCU() */
 
 void setup()
@@ -53,7 +55,7 @@ long lTime;
 
   spilcdFill(0,1);
 //  if (jpeg.open((uint8_t *)f6t, sizeof(f6t), drawMCU))
-  if (jpeg.open((uint8_t *)gray_road, sizeof(gray_road), drawMCU))
+  if (jpeg.open((uint8_t *)st_peters, sizeof(st_peters), drawMCU))
   {
     Serial.println("Successfully opened JPEG image");
     Serial.printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
