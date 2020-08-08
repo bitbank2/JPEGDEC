@@ -68,70 +68,70 @@ static const int iScaleBits[64] = {16384, 22725, 21407, 19266, 16384, 12873,  88
 // input value is 0 to 255, then another 256 for overflow to FF, then 512 more for negative values wrapping around
 // Trims a few instructions off the final output stage
 //
-static const uint8_t ucRangeTable[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15, // 0
-    16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,
-    32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,
-    48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,
-    64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,
-    80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,
-    96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,
-    112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,
-    128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,
-    144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,
-    160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,
-    176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,
-    192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,
-    208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,
-    224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,
-    240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255, // 256
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 512
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 768
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+static const uint8_t ucRangeTable[] = {0x80,0x81,0x82,0x83,0x84,0x85,0x86,0x87,0x88,0x89,0x8a,0x8b,0x8c,0x8d,0x8e,0x8f,
+    0x90,0x91,0x92,0x93,0x94,0x95,0x96,0x97,0x98,0x99,0x9a,0x9b,0x9c,0x9d,0x9e,0x9f,
+    0xa0,0xa1,0xa2,0xa3,0xa4,0xa5,0xa6,0xa7,0xa8,0xa9,0xaa,0xab,0xac,0xad,0xae,0xaf,
+    0xb0,0xb1,0xb2,0xb3,0xb4,0xb5,0xb6,0xb7,0xb8,0xb9,0xba,0xbb,0xbc,0xbd,0xbe,0xbf,
+    0xc0,0xc1,0xc2,0xc3,0xc4,0xc5,0xc6,0xc7,0xc8,0xc9,0xca,0xcb,0xcc,0xcd,0xce,0xcf,
+    0xd0,0xd1,0xd2,0xd3,0xd4,0xd5,0xd6,0xd7,0xd8,0xd9,0xda,0xdb,0xdc,0xdd,0xde,0xdf,
+    0xe0,0xe1,0xe2,0xe3,0xe4,0xe5,0xe6,0xe7,0xe8,0xe9,0xea,0xeb,0xec,0xed,0xee,0xef,
+    0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,0xf8,0xf9,0xfa,0xfb,0xfc,0xfd,0xfe,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,
+    0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,
+    0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x29,0x2a,0x2b,0x2c,0x2d,0x2e,0x2f,
+    0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,
+    0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,
+    0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5a,0x5b,0x5c,0x5d,0x5e,0x5f,
+    0x60,0x61,0x62,0x63,0x64,0x65,0x66,0x67,0x68,0x69,0x6a,0x6b,0x6c,0x6d,0x6e,0x6f,
+    0x70,0x71,0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7a,0x7b,0x7c,0x7d,0x7e,0x7f};
 
 static const uint16_t usRangeTabGray[] = {0x0000,0x0000,0x0000,0x0000,0x0020,0x0020,0x0020,0x0020, // 0
     0x0841,0x0841,0x0841,0x0841,0x0861,0x0861,0x0861,0x0861,
@@ -629,14 +629,14 @@ int JPEGDEC::decode(int iOptions)
 // 3rd party dependencies, not even the C runtime library
 //
 //
-// Initialize a GIF file and callback access from a file on SD or memory
+// Initialize a JPEG file and callback access from a file on SD or memory
 // returns 1 for success, 0 for failure
-// Fills in the canvas size of the GIFIMAGE structure
+// Fills in the basic image info fields of the JPEGIMAGE structure
 //
 static int JPEGInit(JPEGIMAGE *pJPEG)
 {
     return JPEGParseInfo(pJPEG); // gather info for image
-} /* GIFInit() */
+} /* JPEGInit() */
 //
 // Unpack the Huffman tables
 //
@@ -1258,14 +1258,16 @@ static int JPEGFilter(uint8_t *pBuf, uint8_t *d, int iLen, uint8_t *bFF)
 //
 static void JPEGGetMoreData(JPEGIMAGE *pPage)
 {
+//    printf("Getting more data...\n");
     // move any existing data down
     if ((pPage->iVLCSize - pPage->iVLCOff) >= FILE_HIGHWATER)
         return; // buffer is already full; no need to read more data
     if (pPage->iVLCOff != 0)
     {
-      memcpy(pPage->ucFileBuf, &pPage->ucFileBuf[pPage->iVLCOff], pPage->iVLCSize - pPage->iVLCOff);
-      pPage->iVLCSize -= pPage->iVLCOff;
-      pPage->iVLCOff = 0;
+        memcpy(pPage->ucFileBuf, &pPage->ucFileBuf[pPage->iVLCOff], pPage->iVLCSize - pPage->iVLCOff);
+        pPage->iVLCSize -= pPage->iVLCOff;
+        pPage->iVLCOff = 0;
+        pPage->bb.pBuf = pPage->ucFileBuf; // reset VLC source pointer too
     }
     if (pPage->JPEGFile.iPos < pPage->JPEGFile.iSize && pPage->iVLCSize < FILE_HIGHWATER)
     {
@@ -1449,13 +1451,16 @@ static void JPEGFixQuantD(JPEGIMAGE *pJPEG)
 int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
 {
     uint32_t ulCode, ulTemp;
-    unsigned char *pEnd,*pZig;
+    uint8_t *pZig;
     signed char cCoeff;
     unsigned short *pFast;
-    unsigned char ucHuff, ucIndex, *pucFast;
+    unsigned char ucHuff, *pucFast;
     uint32_t usHuff; // this prevents an unnecessary & 65535 for shorts
     uint32_t ulBitOff, ulBits; // local copies to allow compiler to use register vars
-    unsigned char *pBuf;
+    uint8_t *pBuf, *pEnd, *pEnd2;
+    signed short *pMCU = &pJPEG->sMCUs[iMCU];
+    uint8_t ucMaxACCol, ucMaxACRow;
+    
     #define MIN_DCT_THRESHOLD 8
         
     ulBitOff = pJPEG->bb.ulBitOff;
@@ -1471,7 +1476,20 @@ int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
         ulBitOff &= 7;
         ulBits = MOTOLONG(pBuf);
     }
-        
+    if (pJPEG->iOptions & JPEG_SCALE_QUARTER) // reduced size DCT
+    {
+        pMCU[1] = pMCU[8] = pMCU[9] = 0;
+        pEnd2 = (uint8_t *)&cZigZag2[5]; // we only need to store the 4 elements we care about
+    }
+    else
+    {
+        memset(pMCU, 0, 64*sizeof(short)); // pre-fill with zero since we may skip coefficients
+        pEnd2 = (uint8_t *)&cZigZag2[64];
+    }
+    ucMaxACCol = ucMaxACRow = 0;
+    pZig = (unsigned char *)&cZigZag2[1];
+    pEnd = (unsigned char *)&cZigZag2[64];
+
     // get the DC component
     pucFast = &pJPEG->ucHuffDC[pJPEG->ucDCTable * DC_TABLE_SIZE];
     ulCode = (ulBits >> (REGISTER_WIDTH - 12 - ulBitOff)) & 0xfff; // get as lower 12 bits
@@ -1507,6 +1525,7 @@ int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
             (*iDCPredictor) += (int)ulCode;
         }
     }
+    pMCU[0] = (short)*iDCPredictor; // store in MCU[0]
     // Now get the other 63 AC coefficients
     pFast = &pJPEG->usHuffAC[pJPEG->ucACTable * HUFF11SIZE];
     if (pJPEG->b11Bit) // 11-bit "slow" tables used
@@ -1546,13 +1565,13 @@ int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
             if (pZig < pEnd && usHuff) // && piHisto)
             {
                 ulCode = ulBits << ulBitOff;
+                ulTemp = ~(uint32_t) (((int32_t) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
                 ulCode >>= (REGISTER_WIDTH - usHuff);
-                ucIndex = *pZig;
-                // If magnitude is big enough
-//                    if (ulCode*pJPEG->sQuantTable[ucIndex] > MIN_DCT_THRESHOLD)
-//                    {
-//                        piHisto[ucIndex]++; // count this as a useful AC coefficient
-//                    }
+                ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
+                ucMaxACCol |= 1<<(*pZig & 7); // keep track of occupied columns
+                if (*pZig >= 0x20) // if more than 4 rows used in a col, mark it
+                    ucMaxACRow |= 1<<(*pZig & 7); // keep track of the max AC term row
+                pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
             pZig++;
@@ -1590,30 +1609,28 @@ int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
             }
             pZig += (usHuff >> 4);  // get the skip amount (RRRR)
             usHuff &= 0xf; // get (SSSS) - extra length
-            if (pZig < pEnd && usHuff) // && piHisto)
+            if (pZig < pEnd2 && usHuff)
             {
                 ulCode = ulBits << ulBitOff;
+                ulTemp = ~(uint32_t) (((int32_t) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
                 ulCode >>= (REGISTER_WIDTH - usHuff);
-                ucIndex = *pZig;
-                // If magnitude is big enough
-//                    if (ulCode * pJPEG->sQuantTable[ucIndex] > MIN_DCT_THRESHOLD)
-//                    {
-//                        piHisto[ucIndex]++; // count this as a useful AC coefficient
-//                    }
+                ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
+                ucMaxACCol |= 1<<(*pZig & 7); // keep track of occupied columns
+                if (*pZig >= 0x20) // if more than 4 rows used in a col, mark it
+                    ucMaxACRow |= 1<<(*pZig & 7); // keep track of the max AC term row
+                pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
             pZig++;
         } // while
     } // 10-bit tables
-    mcu_done:
-//        if (piHisto) // indicate this MCU is not too dark and has been counted
-//        {
-//            piHisto[0]++;
-//        }
+mcu_done:
     pJPEG->bb.pBuf = pBuf;
+    pJPEG->iVLCOff = (int)(pBuf - pJPEG->ucFileBuf);
     pJPEG->bb.ulBitOff = ulBitOff;
     pJPEG->bb.ulBits = ulBits;
-    pJPEG->ucMaxACCol = pJPEG->ucMaxACRow = 0xff; // DEBUG
+    pJPEG->ucMaxACCol = ucMaxACCol;
+    pJPEG->ucMaxACRow = ucMaxACRow; // DEBUG
     return 0;
 } /* JPEGDecodeMCU() */
 //
@@ -1861,18 +1878,52 @@ void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable, int iACFlags)
         pOutput += 8;
     } // for each row
 } /* JPEGIDCT() */
-
+static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int y)
+{
+    uint16_t *usDest = (uint16_t *)&pJPEG->usPixels[0];
+    int i, j, xcount, ycount;
+    uint8_t *pSrc = (uint8_t *)&pJPEG->sMCUs[0];
+    JPEGDRAW jd;
+    
+    xcount = ycount = 8; // debug
+    jd.iBpp = 8;
+    jd.iHeight = xcount;
+    jd.iWidth = ycount;
+    jd.pPixels = pJPEG->usPixels;
+    jd.x = x;
+    jd.y = y;
+    
+    if ((y + ycount) > pJPEG->iHeight)
+        ycount = pJPEG->iHeight & 7;
+    if ((x + xcount) > pJPEG->iWidth)
+        xcount = pJPEG->iWidth & 7;
+    for (i=0; i<ycount; i++) // do up to 8 rows
+    {
+        for (j=0; j<xcount; j++)
+        {
+            uint8_t c = *pSrc++;
+            uint16_t pix = __builtin_bswap16(usRangeTabGray[c]);
+            *usDest++ = pix;
+        }
+    }
+    (*pJPEG->pfnDraw)(&jd);
+} /* JPEGPutMCUGray() */
+void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int y)
+{
+    
+} /* JPEGPutMCU22() */
 //
 // Decode the image
+// returns 0 for error, 1 for success
 //
 static int DecodeJPEG(JPEGIMAGE *pJPEG, int iOptions)
 {
-    int cx, cy, x, y;
+    int cx, cy, x, y, mcuCX, mcuCY;
     int iLum0, iLum1, iLum2, iLum3, iCr, iCb;
     signed int iDCPred0, iDCPred1, iDCPred2;
     int i, iQuant1, iQuant2, iQuant3, iErr;
     uint8_t c;
-    uint32_t l;
+    uint32_t l, *pl;
     unsigned char cDCTable0, cACTable0, cDCTable1, cACTable1, cDCTable2, cACTable2;
 
     pJPEG->iOptions = iOptions;
@@ -1888,7 +1939,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG, int iOptions)
     cACTable1 = pJPEG->JPCI[1].ac_tbl_no;
     cDCTable2 = pJPEG->JPCI[2].dc_tbl_no;
     cACTable2 = pJPEG->JPCI[2].ac_tbl_no;
-    iDCPred0 = iDCPred1 = iDCPred2 = 0;
+    iDCPred0 = iDCPred1 = iDCPred2 = mcuCX = mcuCY = 0;
     
     switch (pJPEG->ucSubSample) // set up the parameters for the different subsampling options
     {
@@ -1899,24 +1950,30 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG, int iOptions)
             cy = (pJPEG->iHeight + 7) >> 3;
             iCr = MCU1;
             iCb = MCU2;
+            mcuCX = mcuCY = 8;
             break;
         case 0x12:
             cx = (pJPEG->iWidth + 7) >> 3;  // number of MCU blocks
             cy = (pJPEG->iHeight + 15) >> 4;
             iCr = MCU2;
             iCb = MCU3;
+            mcuCX = 8;
+            mcuCY = 16;
             break;
         case 0x21:
             cx = (pJPEG->iWidth + 15) >> 4;  // number of MCU blocks
             cy = (pJPEG->iHeight + 7) >> 3;
             iCr = MCU2;
             iCb = MCU3;
+            mcuCX = 16;
+            mcuCY = 8;
             break;
         case 0x22:
             cx = (pJPEG->iWidth + 15) >> 4;  // number of MCU blocks
             cy = (pJPEG->iHeight + 15) >> 4;
             iCr = MCU4;
             iCb = MCU5;
+            mcuCX = mcuCY = 16;
             break;
         default: // to suppress compiler warning
             cx = cy = 0;
@@ -1932,17 +1989,17 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG, int iOptions)
     iLum2 = MCU2;
     iLum3 = MCU3;
     iErr = 0;
-    for (y = 0; y<cy; y++)
+    for (y = 0; y < cy; y++)
     {
-        for (x = 0; x<cx; x++)
+        for (x = 0; x < cx && iErr == 0; x++)
         {
             pJPEG->ucACTable = cACTable0;
             pJPEG->ucDCTable = cDCTable0;
             // do the first luminance component
             iErr = JPEGDecodeMCU(pJPEG, iLum0, &iDCPred0);
-            if (pJPEG->ucMaxACCol == 0) // no AC components, save some time
+            if (0) //pJPEG->ucMaxACCol == 0) // no AC components, save some time
             {
-                uint32_t *pl = (uint32_t *)&pJPEG->sMCUs[iLum0];
+                pl = (uint32_t *)&pJPEG->sMCUs[iLum0];
                 c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
                 l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
                 // dct stores byte values
@@ -1951,10 +2008,173 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG, int iOptions)
             }
             else
             {
-                JPEGIDCT(pJPEG, iLum0, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
+//                JPEGIDCT(pJPEG, iLum0, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
+                JPEGIDCT(pJPEG, iLum0, pJPEG->JPCI[0].quant_tbl_no, 0xffff); // first quantization table
             }
+            // do the second luminance component
+            if (pJPEG->ucSubSample > 0x11) // subsampling
+            {
+                iErr |= JPEGDecodeMCU(pJPEG, iLum1, &iDCPred0);
+                if (pJPEG->ucMaxACCol == 0) // no AC components, save some time
+                {
+                    c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
+                    l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
+                    // dct stores byte values
+                    pl = (uint32_t *)&pJPEG->sMCUs[iLum0];
+                    for (i = 0; i<16; i++) // 8x8 bytes = 16 longs
+                        pl[i] = l;
+                }
+                else
+                {
+                    JPEGIDCT(pJPEG, iLum1, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
+                }
+                if (pJPEG->ucSubSample == 0x22)
+                {
+                    iErr |= JPEGDecodeMCU(pJPEG, iLum2, &iDCPred0);
+                    if (pJPEG->ucMaxACCol == 0) // no AC components, save some time
+                    {
+                        c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
+                        l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
+                        // dct stores byte values
+                        pl = (uint32_t *)&pJPEG->sMCUs[iLum2];
+                        for (i = 0; i<16; i++) // 8x8 bytes = 16 longs
+                            pl[i] = l;
+                    }
+                    else
+                    {
+                        JPEGIDCT(pJPEG, iLum2, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
+                    }
+                    iErr |= JPEGDecodeMCU(pJPEG, iLum3, &iDCPred0);
+                    if (pJPEG->ucMaxACCol == 0) // no AC components, save some time
+                    {
+                        c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
+                        l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
+                        // dct stores byte values
+                        pl = (uint32_t *)&pJPEG->sMCUs[iLum3];
+                        for (i = 0; i<16; i++) // 8x8 bytes = 16 longs
+                            pl[i] = l;
+                    }
+                    else
+                    {
+                        JPEGIDCT(pJPEG, iLum3, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
+                    }
+                } // if 2:2 subsampling
+            } // if subsampling used
+            if (pJPEG->ucSubSample && pJPEG->ucNumComponents == 3) // if color (not CMYK)
+            {
+                // first chroma
+                pJPEG->ucACTable = cACTable1;
+                pJPEG->ucDCTable = cDCTable1;
+                iErr |= JPEGDecodeMCU(pJPEG, iCr, &iDCPred1);
+                if (pJPEG->ucMaxACCol == 0) // no AC components, save some time
+                {
+                    c = ucRangeTable[((iDCPred1 * iQuant2) >> 5) & 0x3ff];
+                    l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
+                    // dct stores byte values
+                    pl = (uint32_t *)&pJPEG->sMCUs[iCr];
+                    for (i = 0; i<16; i++) // 8x8 bytes = 16 longs
+                        pl[i] = l;
+                }
+                else
+                {
+                    JPEGIDCT(pJPEG, iCr, pJPEG->JPCI[1].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // second quantization table
+                }
+                // second chroma
+                pJPEG->ucACTable = cACTable2;
+                pJPEG->ucDCTable = cDCTable2;
+                iErr |= JPEGDecodeMCU(pJPEG, iCb, &iDCPred2);
+                if (iErr)
+                {
+                    return 0; // decoding error, stop
+                }
+                if (pJPEG->ucMaxACCol == 0) // no AC components, save some time
+                {
+                    c = ucRangeTable[((iDCPred2 * iQuant3) >> 5) & 0x3ff];
+                    l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
+                    // dct stores byte values
+                    pl = (uint32_t *)&pJPEG->sMCUs[iCb];
+                    for (i = 0; i<16; i++) // 8x8 bytes = 16 longs
+                        pl[i] = l;
+                }
+                else
+                {
+                    JPEGIDCT(pJPEG, iCb, pJPEG->JPCI[2].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8)));
+                }
+            } // if color components present
+            switch (pJPEG->ucSubSample)
+            {
+                case 0x00: // grayscale
+                    JPEGPutMCUGray(pJPEG, x*mcuCX, y*mcuCY);
+                    break;
 
+                case 0x11:
+                    if (0) //pJPEG->iOptions & PIL_CONVERT_JPEG_RGB) // Adobe encoded a RGB image as JPEG
+                    { // it can't be subsampled, so 1:1 is the only place it can be
+//                        if (pJPEG->iOptions & JPEG_SCALE_HALF)
+//                            JPEGPutMCURGBHALF(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                        else if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+//                            JPEGPutMCURGBQUARTER(x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+ //                       else
+ //                           JPEGPutMCURGB(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG);
+                    }
+                    else
+                    {
+//                        if (pJPEG->iOptions & JPEG_SCALE_HALF)
+//                            JPEGPutMCU11HALF(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                        else if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+//                            JPEGPutMCU11QUARTER(x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                        else
+//                            JPEGPutMCU11(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+                    }
+                    break;
+                case 0x12:
+//                    if (pJPEG->iOptions & JPEG_SCALE_HALF)
+//                        JPEGPutMCU12HALF(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                    else if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+//                        JPEGPutMCU12QUARTER(x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                    else
+//                        JPEGPutMCU12(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+                    break;
+                case 0x21:
+//                    if (pJPEG->iOptions & JPEG_SCALE_HALF)
+//                        JPEGPutMCU21HALF(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                    else if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+//                        JPEGPutMCU21QUARTER(x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                    else
+//                    {
+//                        if (pJPEG->iOptions & PIL_CONVERT_SIMD)
+//                            JPEGPutMCU21_SIMD(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                        else
+//                            JPEGPutMCU21(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                    }
+                    break;
+                case 0x22:
+//                    if (pJPEG->iOptions & JPEG_SCALE_HALF)
+//                        JPEGPutMCU22HALF(&inpage, x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                    else if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+//                        JPEGPutMCU22QUARTER(x, y, lsize, &pMCU[0], pSlice->pBitmap, pJPEG); // lay down MCU in output image
+//                    else
+                    {
+                        JPEGPutMCU22(pJPEG, x*mcuCX, y*mcuCY); // lay down MCU in output image
+                    }
+                    break;
+            } // switch on color option
+            if (pJPEG->iResInterval)
+            {
+                if (--pJPEG->iResCount == 0)
+                {
+                    pJPEG->iResCount = pJPEG->iResInterval;
+                    iDCPred0 = iDCPred1 = iDCPred2 = 0; // reset DC predictors
+                    if (pJPEG->bb.ulBitOff & 7) // need to start at the next even byte
+                    {
+                        pJPEG->bb.ulBitOff += (8 - (pJPEG->bb.ulBitOff & 7));  // new restart interval starts on byte boundary
+                    }
+                } // if restart interval needs to reset
+            } // if there is a restart interval
+            // See if we need to feed it more data
+            if (pJPEG->iVLCOff >= FILE_HIGHWATER)
+                JPEGGetMoreData(pJPEG); // need more 'filtered' VLC data
         } // for x
     } // for y
-    return 0;
+    return (iErr == 0);
 } /* DecodeJPEG() */

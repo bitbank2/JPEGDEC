@@ -36,7 +36,7 @@
 #define JPEG_SCALE_EIGHTH 8
 #define JPEG_LE_PIXELS 16
 #define JPEG_EXIF_THUMBNAIL 32
-#define JPEG_GRAYSCALE 64
+#define JPEG_LUMA_ONLY 64
 
 #define MCU0 (DCTSIZE * 0)
 #define MCU1 (DCTSIZE * 1)
