@@ -3,7 +3,7 @@
 #include "JPEGDEC.h"
 //#include "test_images/gray_road.h"
 //#include "test_images/f6t.h"
-#include "test_images/biker.h"
+#include "test_images/thumb_test.h"
 
 // Janzen Hub
 #define CS_PIN 4
@@ -57,12 +57,14 @@ long lTime;
 
   spilcdFill(0,1);
 //  if (jpeg.open((uint8_t *)gray_road, sizeof(gray_road), drawMCU))
-  if (jpeg.open((uint8_t *)biker, sizeof(biker), drawMCU))
+  if (jpeg.open((uint8_t *)thumb_test, sizeof(thumb_test), drawMCU))
   {
     Serial.println("Successfully opened JPEG image");
     Serial.printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
+    if (jpeg.hasThumb())
+       Serial.printf("Thumbnail present: %d x %d\n", jpeg.getThumbWidth(), jpeg.getThumbHeight());
     lTime = micros();
-    if (jpeg.decode(40,100,JPEG_SCALE_EIGHTH))
+    if (jpeg.decode(40,100,JPEG_SCALE_QUARTER | JPEG_EXIF_THUMBNAIL))
     {
       lTime = micros() - lTime;
       Serial.printf("Successfully decoded image in %d us\n", (int)lTime);

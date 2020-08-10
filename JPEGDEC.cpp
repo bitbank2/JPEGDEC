@@ -24,7 +24,7 @@
 
 // forward references
 static int JPEGInit(JPEGIMAGE *pJPEG);
-static int JPEGParseInfo(JPEGIMAGE *pPage);
+static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb);
 static void JPEGGetMoreData(JPEGIMAGE *pPage);
 static int DecodeJPEG(JPEGIMAGE *pImage);
 
@@ -531,6 +531,16 @@ int JPEGDEC::hasThumb()
     return (int)_jpeg.ucHasThumb;
 } /* hasThumb() */
 
+int JPEGDEC::getThumbWidth()
+{
+    return _jpeg.iThumbWidth;
+} /* getThumbWidth() */
+
+int JPEGDEC::getThumbHeight()
+{
+    return _jpeg.iThumbHeight;
+} /* getThumbHeight() */
+
 int JPEGDEC::getBpp()
 {
     return (int)_jpeg.ucBpp;
@@ -570,7 +580,7 @@ void JPEGDEC::close()
 // returns:
 // 1 = good result and more frames exist
 // 0 = good result and no more frames exist
-// -1 = error
+//
 int JPEGDEC::decode(int x, int y, int iOptions)
 {
     _jpeg.iXOffset = x;
@@ -589,7 +599,7 @@ int JPEGDEC::decode(int x, int y, int iOptions)
 //
 static int JPEGInit(JPEGIMAGE *pJPEG)
 {
-    return JPEGParseInfo(pJPEG); // gather info for image
+    return JPEGParseInfo(pJPEG, 0); // gather info for image
 } /* JPEGInit() */
 //
 // Unpack the Huffman tables
@@ -1096,27 +1106,38 @@ static int TIFFVALUE(unsigned char *p, int bMotorola)
     return i;
     
 } /* TIFFVALUE() */
-static uint8_t GetEXIFOrientation(JPEGIMAGE *pPage, int bMotorola, int iOffset)
+static void GetTIFFInfo(JPEGIMAGE *pPage, int bMotorola, int iOffset)
 {
     int iTag, iTagCount, i;
-    uint8_t c = 0, *cBuf = pPage->ucFileBuf;
+    uint8_t *cBuf = pPage->ucFileBuf;
     
     iTagCount = TIFFSHORT(&cBuf[iOffset], bMotorola);  /* Number of tags in this dir */
     if (iTagCount < 1 || iTagCount > 256) // invalid tag count
-        return -1; /* Bad header info */
+        return; /* Bad header info */
     /*--- Search the TIFF tags ---*/
     for (i=0; i<iTagCount; i++)
     {
         unsigned char *p = &cBuf[iOffset + (i*12) +2];
         iTag = TIFFSHORT(p, bMotorola);  /* current tag value */
-        if (iTag == 274) // we're only looking for the orientation tag
+        if (iTag == 274) // orientation tag
         {
-            c = TIFFVALUE(p, bMotorola);
-            i = iTagCount; // exit loop - we're done
+            pPage->ucOrientation = TIFFVALUE(p, bMotorola);
+        }
+        else if (iTag == 256) // width of thumbnail
+        {
+            pPage->iThumbWidth = TIFFVALUE(p, bMotorola);
+        }
+        else if (iTag == 257) // height of thumbnail
+        {
+            pPage->iThumbHeight = TIFFVALUE(p, bMotorola);
+        }
+        else if (iTag == 513) // offset to JPEG data
+        {
+            pPage->iThumbData = TIFFVALUE(p, bMotorola);
         }
     }
-    return c;
-} /* GetEXIFOrientation() */
+} /* GetTIFFInfo() */
+
 static int JPEGGetSOS(JPEGIMAGE *pJPEG, int *iOff)
 {
     int16_t sLen;
@@ -1237,7 +1258,7 @@ static void JPEGGetMoreData(JPEGIMAGE *pPage)
 // Parse the JPEG header, gather necessary info to decode the image
 // Returns 1 for success, 0 for failure
 //
-static int JPEGParseInfo(JPEGIMAGE *pPage)
+static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
 {
     int iBytesRead;
     int i, iOffset, iTableOffset;
@@ -1245,6 +1266,11 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
     uint16_t usMarker, usLen = 0;
     int iFilePos = 0;
     
+    if (bExtractThumb) // seek to the start of the thumbnail image
+    {
+        iFilePos = pPage->iThumbData;
+        (*pPage->pfnSeek)(&pPage->JPEGFile, iFilePos);
+    }
     iBytesRead = (*pPage->pfnRead)(&pPage->JPEGFile, s, FILE_BUF_SIZE);
     if (iBytesRead < 256) // a JPEG file this tiny? probably bad
         return 0;
@@ -1260,7 +1286,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
             // Do we need to seek first?
             if (iOffset >= FILE_BUF_SIZE)
             {
-                iFilePos += iOffset;
+                iFilePos += (iOffset - iBytesRead);
                 iOffset = 0;
                 (*pPage->pfnSeek)(&pPage->JPEGFile, iFilePos);
                 iBytesRead = 0; // throw away any old data
@@ -1295,11 +1321,26 @@ static int JPEGParseInfo(JPEGIMAGE *pPage)
             case 0xffe1: // App1 (EXIF?)
                 if (s[iOffset+2] == 'E' && s[iOffset+3] == 'x' && (s[iOffset+8] == 'M' || s[iOffset+8] == 'I')) // the EXIF data we want
                 {
-                    pPage->iEXIF = iFilePos + iOffset + 8; // start of TIFF file
+                    int bMotorola, IFD, iTagCount;
+                    pPage->iEXIF = iFilePos - iBytesRead + iOffset + 8; // start of TIFF file
                     // Get the orientation value (if present)
-                    int bMotorola = (s[iOffset+8] == 'M');
-                    int IFD = TIFFLONG(&s[iOffset+12], bMotorola);
-                    pPage->ucOrientation = GetEXIFOrientation(pPage, bMotorola, IFD+iOffset+8);
+                    bMotorola = (s[iOffset+8] == 'M');
+                    IFD = TIFFLONG(&s[iOffset+12], bMotorola);
+                    iTagCount = TIFFSHORT(&s[iOffset+16], bMotorola);
+                    GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8);
+                    // The second IFD defines the thumbnail (if present)
+                    if (iTagCount >= 1 && iTagCount < 32) // valid number of tags for EXIF data 'page'
+                    {
+                       // point to next IFD
+                        IFD += (12 * iTagCount) + 2;
+                        IFD = TIFFLONG(&s[IFD + iOffset + 8], bMotorola);
+                        if (IFD != 0) // Thumbnail present?
+                        {
+                            pPage->ucHasThumb = 1;
+                            GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8); // info for second 'page' of TIFF
+                            pPage->iThumbData += iOffset + 8; // absolute offset in the file
+                        }
+                    }
                 }
                 break;
             case 0xffc0: // SOFx - start of frame
@@ -2317,6 +2358,17 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     JPEGDRAW jd;
     int iMaxFill = 16, iScaleShift = 0;
 
+    // Requested the Exif thumbnail
+    if (pJPEG->iOptions & JPEG_EXIF_THUMBNAIL)
+    {
+        if (pJPEG->iThumbData == 0 || pJPEG->iThumbWidth == 0) // doesn't exist
+        {
+            pJPEG->iError = JPEG_INVALID_PARAMETER;
+            return 0;
+        }
+        if (!JPEGParseInfo(pJPEG, 1)) // parse the embedded thumbnail file header
+            return 0; // something went wrong
+    }
     // Fast downscaling options
     if (pJPEG->iOptions & JPEG_SCALE_HALF)
         iScaleShift = 1;
@@ -2566,5 +2618,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 JPEGGetMoreData(pJPEG); // need more 'filtered' VLC data
         } // for x
     } // for y
+    if (iErr != 0)
+        pJPEG->iError = JPEG_DECODE_ERROR;
     return (iErr == 0);
 } /* DecodeJPEG() */

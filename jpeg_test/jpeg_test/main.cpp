@@ -11,7 +11,7 @@
 //#include "../../test_images/gray_road.h"
 //#include "../../test_images/st_peters.h"
 //#include "../../test_images/640x480.h"
-#include "../../test_images/biker.h"
+#include "../../test_images/thumb_test.h"
 JPEGDEC jpeg;
 
 void JPEGDraw(JPEGDRAW *pDraw)
@@ -47,20 +47,20 @@ int main(int argc, const char * argv[]) {
 #endif // BOGUS
     
     printf("Starting JPEG decoder...\n");
-//    if (jpeg.open((uint8_t *)f6t, sizeof(f6t), JPEGDraw))
     for (int i=0; i<1; i++)
     {
-//    if (jpeg.open((uint8_t *)st_peters, sizeof(st_peters), JPEGDraw))
-        if (jpeg.open((uint8_t *)biker, sizeof(biker), JPEGDraw))
-    {
-        printf("Successfully opened JPEG\n");
-        printf("Image size: %d x %d, orientation: %d, bpp: %d, subsample: 0x%02x\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp(), jpeg.getSubSample());
-        if (jpeg.decode(0,0,JPEG_SCALE_QUARTER))
+        if (jpeg.open((uint8_t *)thumb_test, sizeof(thumb_test), JPEGDraw))
         {
-            printf("Successfully decoded image\n");
+            printf("Successfully opened JPEG\n");
+            printf("Image size: %d x %d, orientation: %d, bpp: %d, subsample: 0x%02x\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp(), jpeg.getSubSample());
+            if (jpeg.hasThumb())
+                printf("Thumbnail present: %d x %d\n", jpeg.getThumbWidth(), jpeg.getThumbHeight());
+            if (jpeg.decode(0,0,JPEG_SCALE_QUARTER | JPEG_EXIF_THUMBNAIL))
+            {
+                printf("Successfully decoded image\n");
+            }
+            jpeg.close();
         }
-        jpeg.close();
-    }
     } // for i
     return 0;
 }

@@ -131,6 +131,8 @@ int downsampled_height; /* image height in samples, after expansion */
 typedef struct jpeg_image_tag
 {
     int iWidth, iHeight; // image size
+    int iThumbWidth, iThumbHeight; // thumbnail size (if present)
+    int iThumbData; // offset to image data
     int iXOffset, iYOffset; // placement on the display
     uint8_t ucBpp, ucSubSample, ucLittleEndian, ucHuffTableUsed;
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
@@ -176,6 +178,8 @@ class JPEGDEC
     int getBpp();
     int getSubSample();
     int hasThumb();
+    int getThumbWidth();
+    int getThumbHeight();
     int getLastError();
 
   private:
