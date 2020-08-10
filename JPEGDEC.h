@@ -28,6 +28,7 @@
 #define DCTSIZE 64
 #define MAX_MCU_COUNT 6
 #define MAX_COMPS_IN_SCAN 4
+#define MAX_BUFFERED_PIXELS 2048
 
 // Decoder options
 #define JPEG_AUTO_ROTATE 1
@@ -48,6 +49,15 @@
 // RGB565 pixel byte order
 #define BIG_ENDIAN_PIXELS 0
 #define LITTLE_ENDIAN_PIXELS 1
+
+// Error codes returned by getLastError()
+enum {
+    JPEG_SUCCESS = 0,
+    JPEG_INVALID_PARAMETER,
+    JPEG_DECODE_ERROR,
+    JPEG_UNSUPPORTED_FEATURE,
+    JPEG_INVALID_FILE
+};
 
 typedef struct buffered_bits
 {
@@ -120,13 +130,15 @@ int downsampled_height; /* image height in samples, after expansion */
 //
 typedef struct jpeg_image_tag
 {
-    int iWidth, iHeight;
+    int iWidth, iHeight; // image size
+    int iXOffset, iYOffset; // placement on the display
     uint8_t ucBpp, ucSubSample, ucLittleEndian, ucHuffTableUsed;
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
     uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
     uint8_t iScanStart, iScanEnd, ucFF, ucNumComponents;
     uint8_t ucACTable, ucDCTable, ucMaxACCol, ucMaxACRow;
     int iEXIF; // Offset to EXIF 'TIFF' file
+    int iError;
     int iOptions;
     int iVLCOff; // current VLC data offset
     int iVLCSize; // current quantity of data in the VLC buffer
@@ -139,7 +151,7 @@ typedef struct jpeg_image_tag
     JPEGCOMPINFO JPCI[MAX_COMPS_IN_SCAN]; /* Max color components */
     JPEGFILE JPEGFile;
     BUFFERED_BITS bb;
-    uint16_t usPixels[16*16]; // current MCU pixels
+    uint16_t usPixels[MAX_BUFFERED_PIXELS];
     int16_t sMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
     int16_t sQuantTable[DCTSIZE*4]; // quantization tables
     uint8_t ucHuffVals[HUFF_TABLEN*8];
@@ -157,13 +169,14 @@ class JPEGDEC
     int open(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
     int open(char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw);
     void close();
-    int decode(int iOptions);
+    int decode(int x, int y, int iOptions);
     int getOrientation();
     int getWidth();
     int getHeight();
     int getBpp();
     int getSubSample();
     int hasThumb();
+    int getLastError();
 
   private:
     JPEGIMAGE _jpeg;
