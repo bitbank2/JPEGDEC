@@ -126,7 +126,7 @@ int downsampled_height; /* image height in samples, after expansion */
 } JPEGCOMPINFO;
 
 //
-// our private structure to hold a GIF image decode state
+// our private structure to hold a JPEG image decode state
 //
 typedef struct jpeg_image_tag
 {

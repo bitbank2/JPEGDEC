@@ -576,10 +576,10 @@ void JPEGDEC::close()
 } /* close() */
 
 //
-// Play a single frame
+// Decode the image
 // returns:
-// 1 = good result and more frames exist
-// 0 = good result and no more frames exist
+// 1 = good result
+// 0 = error
 //
 int JPEGDEC::decode(int x, int y, int iOptions)
 {
@@ -829,6 +829,7 @@ static int JPEGMakeHuffTables_Slow(JPEGIMAGE *pJPEG, int bThumbnail)
 
 //
 // Expand the Huffman tables for fast decoding
+// returns 1 for success, 0 for failure
 //
 static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
 {
@@ -873,7 +874,7 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
                 iLen = *pBits++; // get number of codes for this bit length
                 if (iBitNum > iMaxLength && iLen > 0) // we can't handle codes longer a certain length
                 {
-                    return -1;
+                    return 0;
                 }
                 while (iLen)
                 {
@@ -888,7 +889,7 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
                     {
                         count = 6 - iBitNum;
                         if (count < 0)
-                            return -1; // DEBUG - something went wrong
+                            return 0; // DEBUG - something went wrong
                         codestart = cc << count;
                         pucTable = &pucShort[codestart];
                     }
@@ -972,12 +973,12 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
                         if (count < 0) // an 11/12-bit? code - that doesn't fit our optimized scheme, see if we can do a bigger table version
                         {
                             if (count == -1 && iTablesUsed <= 4) // we need to create "slow" tables
-                            {
-                                j = JPEGMakeHuffTables_Slow(pJPEG, bThumbnail);
-                                return j;
+                            { // DEBUG
+//                                j = JPEGMakeHuffTables_Slow(pJPEG, bThumbnail);
+                                return 0;
                             }
                             else
-                                return -1; // DEBUG - fatal error, more than 2 big tables we currently don't support
+                                return 0; // DEBUG - fatal error, more than 2 big tables we currently don't support
                         }
                         codestart = cc << count;
                         pTable = &pShort[codestart]; // 10 bits or shorter
@@ -1034,7 +1035,7 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
             } // for each bit length
         } // if table defined
     }
-    return 0;
+    return 1;
 } /* JPEGMakeHuffTables() */
 
 //
@@ -1273,10 +1274,16 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
     }
     iBytesRead = (*pPage->pfnRead)(&pPage->JPEGFile, s, FILE_BUF_SIZE);
     if (iBytesRead < 256) // a JPEG file this tiny? probably bad
+    {
+        pPage->iError = JPEG_INVALID_FILE;
         return 0;
+    }
     iFilePos += iBytesRead;
     if (MOTOSHORT(pPage->ucFileBuf) != 0xffd8)
+    {
+        pPage->iError = JPEG_INVALID_FILE;
         return 0; // not a JPEG file
+    }
     iOffset = 2; /* Start at offset of first marker */
     usMarker = 0; /* Search for SOFx (start of frame) marker */
     while (usMarker != 0xffda && iOffset < pPage->JPEGFile.iSize)
@@ -1316,6 +1323,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
             case 0xffc1:
             case 0xffc2:
             case 0xffc3:
+                pPage->iError = JPEG_UNSUPPORTED_FEATURE;
                 return 0; // currently unsupported modes
                 
             case 0xffe1: // App1 (EXIF?)
@@ -1380,7 +1388,10 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                 iOffset += 2; // skip length
                 usLen -= 2; // subtract length length
                 if (JPEGGetHuffTables(&s[iOffset], usLen, pPage) != 0) // bad tables?
+                {
+                    pPage->iError = JPEG_DECODE_ERROR;
                     return 0; // error
+                }
                 break;
             case 0xffdb: /* M_DQT */
                 /* Get the quantization tables */
@@ -1391,7 +1402,10 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                 {
                     ucTable = s[iOffset++]; // table number
                     if ((ucTable & 0xf) > 3) // invalid table number
+                    {
+                        pPage->iError = JPEG_DECODE_ERROR;
                         return 0;
+                    }
                     iTableOffset = (ucTable & 0xf) * DCTSIZE;
                     if (ucTable & 0xf0) // if word precision
                     {
@@ -1422,7 +1436,11 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
             iOffset -= usLen;
             JPEGGetSOS(pPage, &iOffset); // get Start-Of-Scan info for decoding
         }
-        JPEGMakeHuffTables(pPage, 0); //int bThumbnail) DEBUG
+        if (!JPEGMakeHuffTables(pPage, 0)) //int bThumbnail) DEBUG
+        {
+            pPage->iError = JPEG_UNSUPPORTED_FEATURE;
+            return 0;
+        }
         // Now the offset points to the start of compressed data
         i = JPEGFilter(&pPage->ucFileBuf[iOffset], pPage->ucFileBuf, iBytesRead-iOffset, &pPage->ucFF);
         pPage->iVLCOff = 0;
@@ -1430,6 +1448,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
         JPEGGetMoreData(pPage); // read more VLC data
         return 1;
     }
+    pPage->iError = JPEG_DECODE_ERROR;
     return 0;
 } /* JPEGParseInfo() */
 //
@@ -1897,6 +1916,22 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
     int i, j, xcount, ycount;
     uint8_t *pSrc = (uint8_t *)&pJPEG->sMCUs[0];
     
+    if (pJPEG->iOptions & JPEG_SCALE_HALF) // special handling of 1/2 size (pixel averaging)
+    {
+        int pix;
+        for (i=0; i<4; i++)
+        {
+            for (j=0; j<4; j++)
+            {
+                pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 3) >> 2; // average 2x2 block
+                usDest[i] = __builtin_bswap16(usGrayTo565[pix]);
+                pSrc += 2;
+            }
+            pSrc += 8; // skip extra line
+            usDest += iPitch;
+        }
+        return;
+    }
     xcount = ycount = 8; // debug
     if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
         xcount = ycount = 2;
@@ -1905,11 +1940,7 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
     for (i=0; i<ycount; i++) // do up to 8 rows
     {
         for (j=0; j<xcount; j++)
-        {
-            uint8_t c = *pSrc++;
-            uint16_t pix = __builtin_bswap16(usGrayTo565[c]);
-            *usDest++ = pix;
-        }
+            *usDest++ = __builtin_bswap16(usGrayTo565[*pSrc++]);
         usDest -= xcount;
         usDest += iPitch; // next line
     }

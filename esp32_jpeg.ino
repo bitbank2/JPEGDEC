@@ -56,11 +56,12 @@ void loop() {
 long lTime;
 
   spilcdFill(0,1);
-//  if (jpeg.open((uint8_t *)gray_road, sizeof(gray_road), drawMCU))
+
   if (jpeg.open((uint8_t *)thumb_test, sizeof(thumb_test), drawMCU))
   {
     Serial.println("Successfully opened JPEG image");
-    Serial.printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
+    Serial.printf("Image size: %d x %d, orientation: %d, bpp: %d\n", jpeg.getWidth(),
+      jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
     if (jpeg.hasThumb())
        Serial.printf("Thumbnail present: %d x %d\n", jpeg.getThumbWidth(), jpeg.getThumbHeight());
     lTime = micros();
@@ -71,5 +72,6 @@ long lTime;
     }
     jpeg.close();
   }
+  
   delay(10000);
 }
