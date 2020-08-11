@@ -21,7 +21,7 @@ void JPEGDraw(JPEGDRAW *pDraw)
 
 int main(int argc, const char * argv[]) {
 
-    printf("jpeg structure size = %d\n", sizeof(JPEGIMAGE));
+    printf("jpeg structure size = %d\n", (int)sizeof(JPEGIMAGE));
     
 #ifdef BOGUS
     int i;

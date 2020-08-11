@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1954AB6C24D72E2E002602FB /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1954AB6B24D72E2E002602FB /* main.cpp */; };
-		1954AB7424D72E49002602FB /* JPEGDEC.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1954AB7224D72E49002602FB /* JPEGDEC.cpp */; };
+		1954AB7724E31B4E002602FB /* JPEGDEC.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1954AB7524E31B4E002602FB /* JPEGDEC.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -26,8 +26,8 @@
 /* Begin PBXFileReference section */
 		1954AB6824D72E2E002602FB /* jpeg_test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = jpeg_test; sourceTree = BUILT_PRODUCTS_DIR; };
 		1954AB6B24D72E2E002602FB /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
-		1954AB7224D72E49002602FB /* JPEGDEC.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = JPEGDEC.cpp; path = ../../JPEGDEC.cpp; sourceTree = "<group>"; };
-		1954AB7324D72E49002602FB /* JPEGDEC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = JPEGDEC.h; path = ../../JPEGDEC.h; sourceTree = "<group>"; };
+		1954AB7524E31B4E002602FB /* JPEGDEC.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = JPEGDEC.cpp; path = ../../src/JPEGDEC.cpp; sourceTree = "<group>"; };
+		1954AB7624E31B4E002602FB /* JPEGDEC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = JPEGDEC.h; path = ../../src/JPEGDEC.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,8 +60,8 @@
 		1954AB6A24D72E2E002602FB /* jpeg_test */ = {
 			isa = PBXGroup;
 			children = (
-				1954AB7224D72E49002602FB /* JPEGDEC.cpp */,
-				1954AB7324D72E49002602FB /* JPEGDEC.h */,
+				1954AB7524E31B4E002602FB /* JPEGDEC.cpp */,
+				1954AB7624E31B4E002602FB /* JPEGDEC.h */,
 				1954AB6B24D72E2E002602FB /* main.cpp */,
 			);
 			path = jpeg_test;
@@ -124,7 +124,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1954AB7424D72E49002602FB /* JPEGDEC.cpp in Sources */,
+				1954AB7724E31B4E002602FB /* JPEGDEC.cpp in Sources */,
 				1954AB6C24D72E2E002602FB /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

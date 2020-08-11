@@ -640,6 +640,7 @@ static int JPEGGetHuffTables(uint8_t *pBuf, int iLen, JPEGIMAGE *pJPEG)
     }
     return 0;
 } /* JPEGGetHuffTables() */
+#ifdef FUTURE
 //
 // Create 11-bit lookup tables for some images where it doesn't work
 // for 10-bit tables
@@ -826,7 +827,7 @@ static int JPEGMakeHuffTables_Slow(JPEGIMAGE *pJPEG, int bThumbnail)
     }
     return 0;
 } /* JPEGMakeHuffTables_Slow() */
-
+#endif // FUTURE
 //
 // Expand the Huffman tables for fast decoding
 // returns 1 for success, 0 for failure
@@ -2264,6 +2265,29 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
     pCb = (uint8_t *)&pJPEG->sMCUs[2*DCTSIZE];
     pCr = (uint8_t *)&pJPEG->sMCUs[3*DCTSIZE];
     
+    if (pJPEG->iOptions & JPEG_SCALE_HALF)
+    {
+        for (iRow=0; iRow<4; iRow++)
+        {
+            for (iCol=0; iCol<4; iCol++)
+            {
+                Y1 = (pY[0] + pY[1] + pY[8] + pY[9]) << 10;
+                Cb = (pCb[0] + pCb[1] + 1) >> 1;
+                Cr = (pCr[0] + pCr[1] + 1) >> 1;
+                JPEGPixel(pOutput+iCol, Y1, Cb, Cr);
+                Y1 = (pY[DCTSIZE*2] + pY[DCTSIZE*2+1] + pY[DCTSIZE*2+8] + pY[DCTSIZE*2+9]) << 10;
+                Cb = (pCb[32] + pCb[33] + 1) >> 1;
+                Cr = (pCr[32] + pCr[33] + 1) >> 1;
+                JPEGPixel(pOutput+iCol+iPitch, Y1, Cb, Cr);
+                pCb += 2;
+                pCr += 2;
+                pY += 2;
+            }
+            pY += 8;
+            pOutput += iPitch*2;
+        }
+        return;
+    }
     if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
     {
         Y1 = pY[0] << 12;
@@ -2340,6 +2364,32 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
     pCb = (uint8_t *)&pJPEG->sMCUs[2*DCTSIZE];
     pCr = (uint8_t *)&pJPEG->sMCUs[3*DCTSIZE];
     
+    if (pJPEG->iOptions & JPEG_SCALE_HALF)
+    {
+        for (iRow=0; iRow<4; iRow++)
+        {
+            for (iCol=0; iCol<4; iCol++)
+            {   // left block
+                iCr = (pCr[0] + pCr[8] + 1) >> 1;
+                iCb = (pCb[0] + pCb[8] + 1) >> 1;
+                Y1 = (signed int)(pY[0] + pY[1] + pY[8] + pY[9]) << 10;
+                JPEGPixel(pOutput+iCol, Y1, iCb, iCr);
+                // right block
+                iCr = (pCr[4] + pCr[12] + 1) >> 1;
+                iCb = (pCb[4] + pCb[12] + 1) >> 1;
+                Y1 = (signed int)(pY[128] + pY[129] + pY[136] + pY[137]) << 10;
+                JPEGPixel(pOutput+iCol+4, Y1, iCb, iCr);
+                pCb++;
+                pCr++;
+                pY += 2;
+            }
+            pCb += 12;
+            pCr += 12;
+            pY += 8;
+            pOutput += iPitch;
+        }
+        return;
+    }
     if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
     { // draw 2 pixels
         iCr = pCr[0];
@@ -2378,7 +2428,7 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
         return;
     }
     /* Convert YCC pixels into RGB pixels and store in output image */
-    for (iRow=0; iRow<4; iRow++) // up to 8 rows to do
+    for (iRow=0; iRow<8; iRow++) // up to 8 rows to do
     {
         for (iCol=0; iCol<4; iCol++) // up to 4x2 cols to do
         { // left block
@@ -2394,12 +2444,10 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
             Y2 = (signed int)pY[127] << 12;
             JPEGPixel2(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
         } // for col
-        //         pY += 8; // skip to next line of source pixels
         pCb += 4;
         pCr += 4;
         pOutput += iPitch;
     } // for row
-
 } /* JPEGPutMCU21() */
 //
 // Decode the image
