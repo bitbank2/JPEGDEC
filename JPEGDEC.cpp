@@ -2049,6 +2049,35 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
     pCb = (unsigned char *)&pJPEG->sMCUs[4*DCTSIZE];
     pCr = (unsigned char *)&pJPEG->sMCUs[5*DCTSIZE];
     
+    if (pJPEG->iOptions & JPEG_SCALE_HALF) // special handling of 1/2 size (pixel averaging)
+    {
+        for (iRow=0; iRow<4; iRow++) // 16x16 becomes 8x8 of 2x2 pixels
+        {
+            for (iCol=0; iCol<4; iCol++)
+            {
+                Y1 = (pY[iCol*2] + pY[iCol*2+1] + pY[iCol*2+8] + pY[iCol*2+9]) << 10;
+                Cb = pCb[iCol];
+                Cr = pCr[iCol];
+                JPEGPixel(pOutput+iCol, Y1, Cb, Cr); // top left
+                Y1 = (pY[iCol*2+(DCTSIZE*2)] + pY[iCol*2+1+(DCTSIZE*2)] + pY[iCol*2+8+(DCTSIZE*2)] + pY[iCol*2+9+(DCTSIZE*2)]) << 10;
+                Cb = pCb[iCol+4];
+                Cr = pCr[iCol+4];
+                JPEGPixel(pOutput+iCol+4, Y1, Cb, Cr); // top right
+                Y1 = (pY[iCol*2+(DCTSIZE*4)] + pY[iCol*2+1+(DCTSIZE*4)] + pY[iCol*2+8+(DCTSIZE*4)] + pY[iCol*2+9+(DCTSIZE*4)]) << 10;
+                Cb = pCb[iCol+32];
+                Cr = pCr[iCol+32];
+                JPEGPixel(pOutput+iCol+iPitch*4, Y1, Cb, Cr); // bottom left
+                Y1 = (pY[iCol*2+(DCTSIZE*6)] + pY[iCol*2+1+(DCTSIZE*6)] + pY[iCol*2+8+(DCTSIZE*6)] + pY[iCol*2+9+(DCTSIZE*6)]) << 10;
+                Cb = pCb[iCol+32+4];
+                Cr = pCr[iCol+32+4];
+                JPEGPixel(pOutput+iCol+4+iPitch*4, Y1, Cb, Cr); // bottom right
+            }
+            pY += 8;
+            pCb += 8;
+            pCr += 8;
+            pOutput += iPitch;
+        }
+    }
     if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
     {
         Y1 =  pY[0] << 12; // scale to level of conversion table
