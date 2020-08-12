@@ -22,8 +22,20 @@ Features:<br>
 - Supports Baseline Huffman images (grayscale or YCbCr)
 <br>
 
-Instructions for use:<br>
----------------------<br>
+Acquiring JPEG files to play:
+----------------------------
+You'll notice that the images provided in the test_images folder have been turned into C code. Each byte is now in the form 0xAB so that it can be compiled into your program and stored in FLASH memory alongside your other code. You can use a command line tool called xxd to convert a binary file into this type of text. Make sure to add a const/PROGMEM modifier in front of the JPEG data array to ensure that it gets written to FLASH and not RAM by your build environment.
+
+The Callback functions:
+-----------------------
+One of the ways to allow this code to run on any embedded platform was to define a set of callback functions. These isolate the JPEG decoding logic from the display and file I/O with callback functions. This allows the core code to run on any system, but you need to help it a little. At a minimum, your code must provide a function to draw (or store) each block of image pixels emitted by the library. If you're displaying a JPEG file from memory (RAM or FLASH), this is the only function you need to provide. In the examples folder there are multiple sketches to show how this is done on various display libraries. For reading from SD cards, 4 other functions must be provided: open, close, read, seek. There is an example for implementing these in the examples folder as well.
+Note:
+If you're using the ESP32 or ESP8266 (or another MCU which uses the Harvard Architecture) and decoding JPEG images stored in RAM or FLASH, you'll need to use the correct open function (openRAM or openFLASH). For MCUs based on the ARM Cortex-M, they are interchangeable.
+
+The API:
+--------
+Please consult the Wiki for detailed info about each method exposed by the JPEGDEC class.
+
 
 If you find this code useful, please consider becoming a sponsor or sending a donation.
 
