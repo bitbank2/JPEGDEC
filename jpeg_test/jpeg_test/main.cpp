@@ -49,7 +49,7 @@ int main(int argc, const char * argv[]) {
     printf("Starting JPEG decoder...\n");
     for (int i=0; i<1; i++)
     {
-        if (jpeg.open((uint8_t *)thumb_test, sizeof(thumb_test), JPEGDraw))
+        if (jpeg.openFLASH((uint8_t *)thumb_test, sizeof(thumb_test), JPEGDraw))
         {
             printf("Successfully opened JPEG\n");
             printf("Image size: %d x %d, orientation: %d, bpp: %d, subsample: 0x%02x\n", jpeg.getWidth(), jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp(), jpeg.getSubSample());

@@ -468,7 +468,21 @@ static const uint16_t usRangeTableB[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x00
 //
 // Helper functions for memory based images
 //
-static int32_t readMem(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
+static int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
+{
+    int32_t iBytesRead;
+
+    iBytesRead = iLen;
+    if ((pFile->iSize - pFile->iPos) < iLen)
+       iBytesRead = pFile->iSize - pFile->iPos;
+    if (iBytesRead <= 0)
+       return 0;
+    memcpy(pBuf, &pFile->pData[pFile->iPos], iBytesRead);
+    pFile->iPos += iBytesRead;
+    return iBytesRead;
+} /* readRAM() */
+
+static int32_t readFLASH(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
     int32_t iBytesRead;
 
@@ -480,7 +494,7 @@ static int32_t readMem(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
     memcpy_P(pBuf, &pFile->pData[pFile->iPos], iBytesRead);
     pFile->iPos += iBytesRead;
     return iBytesRead;
-} /* readMem() */
+} /* readFLASH() */
 
 static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition)
 {
@@ -493,10 +507,11 @@ static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition)
 //
 // Memory initialization
 //
-int JPEGDEC::open(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
+int JPEGDEC::openRAM(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     memset(&_jpeg, 0, sizeof(JPEGIMAGE));
-    _jpeg.pfnRead = readMem;
+    _jpeg.ucMemType = JPEG_MEM_RAM;
+    _jpeg.pfnRead = readRAM;
     _jpeg.pfnSeek = seekMem;
     _jpeg.pfnDraw = pfnDraw;
     _jpeg.pfnOpen = NULL;
@@ -504,7 +519,21 @@ int JPEGDEC::open(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
     _jpeg.JPEGFile.iSize = iDataSize;
     _jpeg.JPEGFile.pData = pData;
     return JPEGInit(&_jpeg);
-} /* open() */
+} /* openRAM() */
+
+int JPEGDEC::openFLASH(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
+{
+    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
+    _jpeg.ucMemType = JPEG_MEM_FLASH;
+    _jpeg.pfnRead = readFLASH;
+    _jpeg.pfnSeek = seekMem;
+    _jpeg.pfnDraw = pfnDraw;
+    _jpeg.pfnOpen = NULL;
+    _jpeg.pfnClose = NULL;
+    _jpeg.JPEGFile.iSize = iDataSize;
+    _jpeg.JPEGFile.pData = pData;
+    return JPEGInit(&_jpeg);
+} /* openRAM() */
 
 int JPEGDEC::getOrientation()
 {
@@ -607,9 +636,10 @@ static int JPEGInit(JPEGIMAGE *pJPEG)
 static int JPEGGetHuffTables(uint8_t *pBuf, int iLen, JPEGIMAGE *pJPEG)
 {
     int i, j, iOffset, iTableOffset;
-    unsigned char ucTable;
+    uint8_t ucTable, *pHuffVals;
     
     iOffset = 0;
+    pHuffVals = (uint8_t *)pJPEG->usPixels; // temp holding area to save RAM
     while (iLen > 17)  // while there are tables to copy (we may have combined more than 1 table together)
     {
         ucTable = pBuf[iOffset++]; // get table index
@@ -623,7 +653,7 @@ static int JPEGGetHuffTables(uint8_t *pBuf, int iLen, JPEGIMAGE *pJPEG)
             for (i=0; i<16; i++)
             {
                 j += pBuf[iOffset];
-                pJPEG->ucHuffVals[iTableOffset+i] = pBuf[iOffset++];
+                pHuffVals[iTableOffset+i] = pBuf[iOffset++];
             }
             iLen -= 17; // subtract length of bit lengths
             if (j == 0 || j > 256 || j > iLen) // bogus bit lengths
@@ -633,7 +663,7 @@ static int JPEGGetHuffTables(uint8_t *pBuf, int iLen, JPEGIMAGE *pJPEG)
             iTableOffset += 16;
             for (i=0; i<j; i++)
             {  // copy huffman table
-                pJPEG->ucHuffVals[iTableOffset+i] = pBuf[iOffset++];
+                pHuffVals[iTableOffset+i] = pBuf[iOffset++];
             }
             iLen -= j;
         }
@@ -837,16 +867,17 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
     int code, repeat, count, codestart;
     int j;
     int iLen, iTable;
-    unsigned short *pTable, *pShort, *pLong;
-    unsigned char *pucTable, *pucShort, *pucLong;
+    uint16_t *pTable, *pShort, *pLong;
+    uint8_t *pHuffVals, *pucTable, *pucShort, *pucLong;
     uint32_t ul, *pLongTable;
     int iBitNum; // current code bit length
     int cc; // code
-    unsigned char *p, *pBits, ucCode;
+    uint8_t *p, *pBits, ucCode;
     int iMaxLength, iMaxMask;
     int iTablesUsed;
     
     iTablesUsed = 0;
+    pHuffVals = (uint8_t *)pJPEG->usPixels;
     for (j=0; j<4; j++)
     {
         if (pJPEG->ucHuffTableUsed & (1 << j))
@@ -866,7 +897,7 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
             pucShort = &pJPEG->ucHuffDC[iTable*DC_TABLE_SIZE];
             //         pJPEG->huffdc[iTable] = pJPEG->huffdcFast[iTable] + 0x20; // 0x20 longs = 128 bytes
             pucLong = &pJPEG->ucHuffDC[iTable*DC_TABLE_SIZE + 128];
-            pBits = &pJPEG->ucHuffVals[iTable * HUFF_TABLEN];
+            pBits = &pHuffVals[iTable * HUFF_TABLEN];
             p = pBits;
             p += 16; // point to bit data
             cc = 0; // start with a code of 0
@@ -950,7 +981,7 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
     {
         if (pJPEG->ucHuffTableUsed & (1 << (iTable+4)))  // if this table is defined
         {
-            pBits = &pJPEG->ucHuffVals[(iTable+4) * HUFF_TABLEN];
+            pBits = &pHuffVals[(iTable+4) * HUFF_TABLEN];
             p = pBits;
             p += 16; // point to bit data
             pShort = &pJPEG->usHuffAC[iTable*HUFF11SIZE];
@@ -1374,8 +1405,8 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                         ucSamp = s[iOffset++]; // get the h+v sampling factor
                         if (i == 0) // Y component?
                             pPage->ucSubSample = ucSamp;
-                        pPage->JPCI[i].h_samp_factor = ucSamp >> 4;
-                        pPage->JPCI[i].v_samp_factor = ucSamp & 0xf;
+//                        pPage->JPCI[i].h_samp_factor = ucSamp >> 4;
+//                        pPage->JPCI[i].v_samp_factor = ucSamp & 0xf;
                         pPage->JPCI[i].quant_tbl_no = s[iOffset++]; // quantization table number
                         usLen -= 3;
                     }

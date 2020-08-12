@@ -50,6 +50,11 @@
 #define BIG_ENDIAN_PIXELS 0
 #define LITTLE_ENDIAN_PIXELS 1
 
+enum {
+    JPEG_MEM_RAM=0,
+    JPEG_MEM_FLASH
+};
+
 // Error codes returned by getLastError()
 enum {
     JPEG_SUCCESS = 0,
@@ -98,8 +103,8 @@ typedef struct _jpegcompinfo
 unsigned char component_needed;  /*  do we need the value of this component? */
 unsigned char component_id;     /* identifier for this component (0..255) */
 unsigned char component_index;  /* its index in SOF or cinfo->comp_info[] */
-unsigned char h_samp_factor;    /* horizontal sampling factor (1..4) */
-unsigned char v_samp_factor;    /* vertical sampling factor (1..4) */
+//unsigned char h_samp_factor;    /* horizontal sampling factor (1..4) */
+//unsigned char v_samp_factor;    /* vertical sampling factor (1..4) */
 unsigned char quant_tbl_no;     /* quantization table selector (0..3) */
 // These values may vary between scans
 // For compression, they must be supplied by the user interface
@@ -107,15 +112,15 @@ unsigned char quant_tbl_no;     /* quantization table selector (0..3) */
 unsigned char dc_tbl_no;        /* DC entropy table selector (0..3) */
 unsigned char ac_tbl_no;        /* AC entropy table selector (0..3) */
 // These values are computed during compression or decompression startup
-int true_comp_width;  /* component's image width in samples */
-int true_comp_height; /* component's image height in samples */
+//int true_comp_width;  /* component's image width in samples */
+//int true_comp_height; /* component's image height in samples */
 // the above are the logical dimensions of the downsampled image
 // These values are computed before starting a scan of the component
-int MCU_width;        /* number of blocks per MCU, horizontally */
-int MCU_height;       /* number of blocks per MCU, vertically */
-int MCU_blocks;       /* MCU_width * MCU_height */
-int downsampled_width; /* image width in samples, after expansion */
-int downsampled_height; /* image height in samples, after expansion */
+//int MCU_width;        /* number of blocks per MCU, horizontally */
+//int MCU_height;       /* number of blocks per MCU, vertically */
+//int MCU_blocks;       /* MCU_width * MCU_height */
+//int downsampled_width; /* image width in samples, after expansion */
+//int downsampled_height; /* image height in samples, after expansion */
 // the above are the true_comp_xxx values rounded up to multiples of
 // the MCU dimensions; these are the working dimensions of the array
 // as it is passed through the DCT or IDCT step.  NOTE: these values
@@ -139,6 +144,7 @@ typedef struct jpeg_image_tag
     uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
     uint8_t iScanStart, iScanEnd, ucFF, ucNumComponents;
     uint8_t ucACTable, ucDCTable, ucMaxACCol, ucMaxACRow;
+    uint8_t ucMemType;
     int iEXIF; // Offset to EXIF 'TIFF' file
     int iError;
     int iOptions;
@@ -156,7 +162,6 @@ typedef struct jpeg_image_tag
     uint16_t usPixels[MAX_BUFFERED_PIXELS];
     int16_t sMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
     int16_t sQuantTable[DCTSIZE*4]; // quantization tables
-    uint8_t ucHuffVals[HUFF_TABLEN*8];
     uint8_t ucFileBuf[FILE_BUF_SIZE]; // holds temp data and pixel stack
     uint8_t ucHuffDC[DC_TABLE_SIZE * 2]; // up to 2 'short' tables
     uint16_t usHuffAC[HUFF11SIZE * 2];
@@ -168,7 +173,8 @@ typedef struct jpeg_image_tag
 class JPEGDEC
 {
   public:
-    int open(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
+    int openRAM(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
+    int openFLASH(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
     int open(char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw);
     void close();
     int decode(int x, int y, int iOptions);
