@@ -59,7 +59,7 @@ int iCenterY[4] = {0,60,90,105};
     if (jpeg.openFLASH((uint8_t *)thumb_test, sizeof(thumb_test), JPEGDraw))
     {
       lTime = micros();
-      if (jpeg.decode(iCenterX[0],iCenterY[0],JPEG_EXIF_THUMBNAIL | iOption[i]))
+      if (jpeg.decode(iCenterX[i],iCenterY[i],JPEG_EXIF_THUMBNAIL | iOption[i]))
       {
         lTime = micros() - lTime;
         Serial.printf("%d x %d image, decode time = %d us\n", jpeg.getWidth() >> i, jpeg.getHeight() >> i, (int)lTime);
