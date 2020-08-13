@@ -504,6 +504,12 @@ static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition)
     return iPosition;
 } /* seekMem() */
 
+void JPEGDEC::setMaxOutputSize(int iMaxMCUs)
+{
+    if (iMaxMCUs < 1)
+        iMaxMCUs = 1; // don't allow invalid value
+    _jpeg.iMaxMCUs = iMaxMCUs;
+} /* setMaxOutputSize() */
 //
 // Memory initialization
 //
@@ -518,6 +524,7 @@ int JPEGDEC::openRAM(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
     _jpeg.pfnClose = NULL;
     _jpeg.JPEGFile.iSize = iDataSize;
     _jpeg.JPEGFile.pData = pData;
+    _jpeg.iMaxMCUs = 1000; // set to an unnaturally high value to start
     return JPEGInit(&_jpeg);
 } /* openRAM() */
 
@@ -532,6 +539,7 @@ int JPEGDEC::openFLASH(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDra
     _jpeg.pfnClose = NULL;
     _jpeg.JPEGFile.iSize = iDataSize;
     _jpeg.JPEGFile.pData = pData;
+    _jpeg.iMaxMCUs = 1000; // set to an unnaturally high value to start
     return JPEGInit(&_jpeg);
 } /* openRAM() */
 
@@ -591,6 +599,7 @@ int JPEGDEC::open(char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALL
     _jpeg.pfnDraw = pfnDraw;
     _jpeg.pfnOpen = pfnOpen;
     _jpeg.pfnClose = pfnClose;
+    _jpeg.iMaxMCUs = 1000; // set to an unnaturally high value to start
     _jpeg.JPEGFile.fHandle = (*pfnOpen)(szFilename, &_jpeg.JPEGFile.iSize);
     if (_jpeg.JPEGFile.fHandle == NULL)
        return 0;
@@ -2109,6 +2118,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
             pCr += 8;
             pOutput += iPitch;
         }
+        return;
     }
     if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
     {
@@ -2594,6 +2604,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     iMCUCount = MAX_BUFFERED_PIXELS / (mcuCX * mcuCY);
     if (iMCUCount > cx)
         iMCUCount = cx; // don't go wider than the image
+    if (iMCUCount > pJPEG->iMaxMCUs) // did the user set an upper bound on how many pixels per JPEGDraw callback?
+        iMCUCount = pJPEG->iMaxMCUs;
     jd.iBpp = pJPEG->ucBpp;
     jd.pPixels = pJPEG->usPixels;
     jd.iHeight = mcuCY;

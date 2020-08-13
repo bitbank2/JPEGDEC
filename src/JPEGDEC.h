@@ -151,6 +151,7 @@ typedef struct jpeg_image_tag
     int iVLCOff; // current VLC data offset
     int iVLCSize; // current quantity of data in the VLC buffer
     int iResInterval, iResCount; // restart interval
+    int iMaxMCUs; // max MCUs of pixels per JPEGDraw call
     JPEG_READ_CALLBACK *pfnRead;
     JPEG_SEEK_CALLBACK *pfnSeek;
     JPEG_DRAW_CALLBACK *pfnDraw;
@@ -187,6 +188,7 @@ class JPEGDEC
     int getThumbWidth();
     int getThumbHeight();
     int getLastError();
+    void setMaxOutputSize(int iMaxMCUs);
 
   private:
     JPEGIMAGE _jpeg;

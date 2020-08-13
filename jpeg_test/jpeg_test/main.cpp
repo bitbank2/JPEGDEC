@@ -16,7 +16,7 @@ JPEGDEC jpeg;
 
 void JPEGDraw(JPEGDRAW *pDraw)
 {
-//    printf("x,y=%d,%d, p[0] = 0x%04x\n", pDraw->x, pDraw->y, pDraw->pPixels[0]);
+    printf("x,y=%d,%d, p[0] = 0x%04x\n", pDraw->x, pDraw->y, pDraw->pPixels[0]);
 } /* JPEGDraw() */
 
 int main(int argc, const char * argv[]) {
