@@ -4,7 +4,7 @@ Copyright (c) 2020 BitBank Software, Inc.<br>
 Written by Larry Bank<br>
 larry@bitbanksoftware.com<br>
 <br>
-**I optimize other people's code for a living. This library is a good example of the kind of work I do for my commercial clients; it contains many unique and clever optimizations that allows it to perform better than anything else available. I happily donate my time to a lot of open source projects like this one, but I also have a family to feed. Whatever platform you're using, I can make significant improvements to your native code. Please contact me so that I can show you how.**<br>
+**I optimize other people's code for a living. This library is a good example of the kind of work I do for my commercial clients; it contains many unique and clever optimizations that allows it to perform better than anything else available. I'm happy to contribute optimized libraries to the open source community in addition to working on commercial projects. Whatever platform you're using, I can make significant improvements to your native code. Please contact me so that I can show you how.**<br>
 <br>
 ![JPEGDEC](/demo.jpg?raw=true "JPEGDEC")
 <br>
