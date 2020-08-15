@@ -21,11 +21,9 @@ Features:<br>
 - The C code doing the heavy lifting is completely portable and has no external dependencies.
 - Includes fast downscaling options (1/2, 1/4, 1/8).
 - Includes option to detect and decode the embedded Exif thumbnail
-- Supports Baseline Huffman images (grayscale or YCbCr)
+- Supports Baseline Huffman images (grayscale or YCbCr)<br>
 <br>
-
-<br>
-![Perf](/perfchart.jpg?raw=true "PerfChart")
+![perfchart](/perf.jpg?raw=true)
 <br>
 **A note about performance**<br>
 The chart above gives you an idea of how the code performs on various MCUs with the different scaling options. The test image used is both large in dimension and large in terms of the compressed data size. The two factors that have the most influence on performance are the compressed data size and the output scaling options. This is because the time to decode JPEG data scales mostly linearly with the amount of data to decode. To get the fastest decode speed, choose the lowest acceptable quality for your image; this will produce the smallest compressed data size. When you must use an image that is too large, the scaling options allow you to display it at a lower resolution than the original.<br>
