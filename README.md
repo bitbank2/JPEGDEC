@@ -24,6 +24,12 @@ Features:<br>
 - Supports Baseline Huffman images (grayscale or YCbCr)
 <br>
 
+<br>
+![Perf](/perfchart.jpg?raw=true "PerfChart")
+<br>
+**A note about performance**<br>
+The chart above gives you an idea of how the code performs on various MCUs with the different scaling options. The test image used is both large in dimension and large in terms of the compressed data size. The two factors that have the most influence on performance are the compressed data size and the output scaling options. This is because the time to decode JPEG data scales mostly linearly with the amount of data to decode. To get the fastest decode speed, choose the lowest acceptable quality for your image; this will produce the smallest compressed data size. When you must use an image that is too large, the scaling options allow you to display it at a lower resolution than the original.<br>
+
 Acquiring JPEG files to play:
 ----------------------------
 You'll notice that the images provided in the test_images folder have been turned into C code. Each byte is now in the form 0xAB so that it can be compiled into your program and stored in FLASH memory alongside your other code. You can use a command line tool called xxd to convert a binary file into this type of text. Make sure to add a const/PROGMEM modifier in front of the JPEG data array to ensure that it gets written to FLASH and not RAM by your build environment.
