@@ -1964,7 +1964,7 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
         {
             for (j=0; j<4; j++)
             {
-                pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 3) >> 2; // average 2x2 block
+                pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 2) >> 2; // average 2x2 block
                 usDest[i] = __builtin_bswap16(usGrayTo565[pix]);
                 pSrc += 2;
             }
@@ -2028,12 +2028,33 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
     int iCol;
     int iRow;
     uint8_t *pY, *pCr, *pCb;
-    uint16_t *pOutput = pJPEG->usPixels;
+    uint16_t *pOutput = &pJPEG->usPixels[x];
 
     pY  = (unsigned char *)&pJPEG->sMCUs[0*DCTSIZE];
     pCb = (unsigned char *)&pJPEG->sMCUs[1*DCTSIZE];
     pCr = (unsigned char *)&pJPEG->sMCUs[2*DCTSIZE];
     
+    if (pJPEG->iOptions & JPEG_SCALE_HALF)
+    {
+        for (iRow=0; iRow<4; iRow++) // up to 8 rows to do
+        {
+            for (iCol=0; iCol<4; iCol++) // up to 4x2 cols to do
+            {
+                iCr = (pCr[0] + pCr[1] + pCr[8] + pCr[9] + 2) >> 2;
+                iCb = (pCb[0] + pCb[1] + pCb[8] + pCb[9] + 2) >> 2;
+                Y = (pY[0] + pY[1] + pY[8] + pY[9]) << 10;
+                JPEGPixel(pOutput+iCol, Y, iCb, iCr);
+                pCr += 2;
+                pCb += 2;
+                pY += 2;
+            } // for col
+            pCr += 8;
+            pCb += 8;
+            pY += 8;
+            pOutput += iPitch;
+        } // for row
+        return;
+    }
     if (pJPEG->iOptions & JPEG_SCALE_EIGHTH) // special case for 1/8 scaling
     {
         // only 4 pixels to draw, so no looping needed
