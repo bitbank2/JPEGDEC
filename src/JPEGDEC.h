@@ -46,9 +46,9 @@
 #define MCU4 (DCTSIZE * 4)
 #define MCU5 (DCTSIZE * 5)
 
-// RGB565 pixel byte order
-#define BIG_ENDIAN_PIXELS 0
-#define LITTLE_ENDIAN_PIXELS 1
+// RGB565 pixel byte order (defaults to little endian)
+#define LITTLE_ENDIAN_PIXELS 0
+#define BIG_ENDIAN_PIXELS 1
 
 enum {
     JPEG_MEM_RAM=0,
@@ -91,7 +91,7 @@ typedef struct jpeg_draw_tag
 typedef int32_t (JPEG_READ_CALLBACK)(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
 typedef int32_t (JPEG_SEEK_CALLBACK)(JPEGFILE *pFile, int32_t iPosition);
 typedef void (JPEG_DRAW_CALLBACK)(JPEGDRAW *pDraw);
-typedef void * (JPEG_OPEN_CALLBACK)(char *szFilename, int32_t *pFileSize);
+typedef void * (JPEG_OPEN_CALLBACK)(const char *szFilename, int32_t *pFileSize);
 typedef void (JPEG_CLOSE_CALLBACK)(void *pHandle);
 
 /* JPEG color component info */
@@ -139,12 +139,12 @@ typedef struct jpeg_image_tag
     int iThumbWidth, iThumbHeight; // thumbnail size (if present)
     int iThumbData; // offset to image data
     int iXOffset, iYOffset; // placement on the display
-    uint8_t ucBpp, ucSubSample, ucLittleEndian, ucHuffTableUsed;
+    uint8_t ucBpp, ucSubSample, ucHuffTableUsed;
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
     uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
     uint8_t iScanStart, iScanEnd, ucFF, ucNumComponents;
     uint8_t ucACTable, ucDCTable, ucMaxACCol, ucMaxACRow;
-    uint8_t ucMemType;
+    uint8_t ucMemType, ucPixelType;
     int iEXIF; // Offset to EXIF 'TIFF' file
     int iError;
     int iOptions;
@@ -188,6 +188,7 @@ class JPEGDEC
     int getThumbWidth();
     int getThumbHeight();
     int getLastError();
+    void setPixelType(int iType); // defaults to little endian
     void setMaxOutputSize(int iMaxMCUs);
 
   private:

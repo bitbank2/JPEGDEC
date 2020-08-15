@@ -64,6 +64,7 @@ long lTime;
       jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
     if (jpeg.hasThumb())
        Serial.printf("Thumbnail present: %d x %d\n", jpeg.getThumbWidth(), jpeg.getThumbHeight());
+    jpeg.setPixelType(BIG_ENDIAN_PIXELS);
     lTime = micros();
     if (jpeg.decode(40,100,JPEG_SCALE_QUARTER | JPEG_EXIF_THUMBNAIL))
     {

@@ -30,7 +30,7 @@ void JPEGDraw(JPEGDRAW *pDraw)
 //  Serial.printf("Pixel 0 = 0x%04x\n", pDraw->pPixels[0]);
   tft.dmaWait(); // Wait for prior writePixels() to finish
   tft.setAddrWindow(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
-  tft.writePixels(pDraw->pPixels, pDraw->iWidth * pDraw->iHeight, true, true); // Use DMA, big-endian
+  tft.writePixels(pDraw->pPixels, pDraw->iWidth * pDraw->iHeight, true, false); // Use DMA, big-endian
 } /* JPEGDraw() */
 
 void setup() {
