@@ -61,11 +61,7 @@ int32_t mySeek(JPEGFILE *handle, int32_t position) {
 void JPEGDraw(JPEGDRAW *pDraw) {
   //Serial.printf("jpeg draw: x,y=%d,%d, cx,cy = %d,%d\n",
      //pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
-  const uint16_t *data = pDraw->pPixels;
-  for (int i=0; i < pDraw->iWidth * pDraw->iHeight; i++) {
-    pDraw->pPixels[i] = __builtin_bswap16(pDraw->pPixels[i]);
-  }
-  tft.writeRect(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight, data);
+  tft.writeRect(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight, pDraw->pPixels);
 }
 
 // Main loop, scan for all .JPG files on the card and display them
