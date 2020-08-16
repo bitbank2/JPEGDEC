@@ -46,9 +46,11 @@
 #define MCU4 (DCTSIZE * 4)
 #define MCU5 (DCTSIZE * 5)
 
-// RGB565 pixel byte order (defaults to little endian)
-#define LITTLE_ENDIAN_PIXELS 0
-#define BIG_ENDIAN_PIXELS 1
+// Pixel types (defaults to little endian RGB565)
+#define RGB565_LITTLE_ENDIAN 0
+#define RGB565_BIG_ENDIAN 1
+#define EIGHT_BIT_GRAYSCALE 2
+
 
 enum {
     JPEG_MEM_RAM=0,
