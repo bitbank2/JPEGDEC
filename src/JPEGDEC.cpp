@@ -596,7 +596,7 @@ int JPEGDEC::getSubSample()
 //
 // File (SD/MMC) based initialization
 //
-int JPEGDEC::open(char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
+int JPEGDEC::open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     memset(&_jpeg, 0, sizeof(JPEGIMAGE));
     _jpeg.pfnRead = pfnRead;
