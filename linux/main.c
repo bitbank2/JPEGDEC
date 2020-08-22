@@ -43,7 +43,17 @@ int rc;
 	    lTime = micros() - lTime;
             printf("full sized decode in %d us\n", (int)lTime);
 	}
+	else
+	{
+            printf("Decode failed, last error = %d\n", JPEG_getLastError(&jpg));
+	    return 0;
+	}
 	JPEG_close(&jpg);
+    }
+    else
+    {
+	printf("open() failed, last error = %d\n", JPEG_getLastError(&jpg));
+	return 0;
     }
 
     if (argc == 2)

@@ -514,6 +514,11 @@ int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *
     return JPEGInit(pJPEG);
 } /* JPEG_openFile() */
 
+int JPEG_getLastError(JPEGIMAGE *pJPEG)
+{
+    return pJPEG->iError;
+} /* JPEG_getLastError() */
+
 int JPEG_getWidth(JPEGIMAGE *pJPEG)
 {
     return pJPEG->iWidth;

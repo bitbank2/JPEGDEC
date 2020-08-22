@@ -219,7 +219,7 @@ int JPEG_getWidth(JPEGIMAGE *pJPEG);
 int JPEG_getHeight(JPEGIMAGE *pJPEG);
 int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions);
 void JPEG_close(JPEGIMAGE *pJPEG);
-
+int JPEG_getLastError(JPEGIMAGE *pJPEG);
 #endif // __cplusplus
 
 // Due to unaligned memory causing an exception, we have to do these macros the slow way
