@@ -183,6 +183,8 @@ typedef struct jpeg_image_tag
     uint16_t usHuffAC[HUFF11SIZE * 2];
 } JPEGIMAGE;
 
+#ifdef __cplusplus
+#define JPEG_STATIC static
 //
 // The JPEGDEC class wraps portable C code which does the actual work
 //
@@ -209,6 +211,14 @@ class JPEGDEC
   private:
     JPEGIMAGE _jpeg;
 };
+#else
+#define JPEG_STATIC
+int JPEG_openRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
+int JPEG_getWidth(JPEGIMAGE *pJPEG);
+int JPEG_getHeight(JPEGIMAGE *pJPEG);
+int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions);
+void JPEG_close(JPEGIMAGE *pJPEG);
+#endif // __cplusplus
 
 // Due to unaligned memory causing an exception, we have to do these macros the slow way
 #define INTELSHORT(p) ((*p) + (*(p+1)<<8))
