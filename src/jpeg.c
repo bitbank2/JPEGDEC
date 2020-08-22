@@ -29,6 +29,9 @@ static void JPEGGetMoreData(JPEGIMAGE *pPage);
 JPEG_STATIC int DecodeJPEG(JPEGIMAGE *pImage);
 JPEG_STATIC int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
 JPEG_STATIC int32_t seekMem(JPEGFILE *pFile, int32_t iPosition);
+JPEG_STATIC int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
+JPEG_STATIC int32_t seekFile(JPEGFILE *pFile, int32_t iPosition);
+JPEG_STATIC void closeFile(void *handle);
 
 /* JPEG tables */
 // zigzag ordering of DCT coefficients
@@ -489,6 +492,28 @@ int JPEG_openRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize, JPEG_DRAW_CALL
     pJPEG->iMaxMCUs = 1000; // set to an unnaturally high value to start
     return JPEGInit(pJPEG);
 } /* JPEG_openRAM() */
+//
+// File initialization
+//
+int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw)
+{
+    memset(pJPEG, 0, sizeof(JPEGIMAGE));
+    pJPEG->ucMemType = JPEG_MEM_RAM;
+    pJPEG->pfnRead = readFile;
+    pJPEG->pfnSeek = seekFile;
+    pJPEG->pfnDraw = pfnDraw;
+    pJPEG->pfnOpen = NULL;
+    pJPEG->pfnClose = closeFile;
+    pJPEG->iMaxMCUs = 1000; // set to an unnaturally high value to start
+    pJPEG->JPEGFile.fHandle = fopen(szFilename, "r+b");
+    if (pJPEG->JPEGFile.fHandle == NULL)
+       return 0;
+    fseek((FILE *)pJPEG->JPEGFile.fHandle, 0, SEEK_END);
+    pJPEG->JPEGFile.iSize = (int)ftell((FILE *)pJPEG->JPEGFile.fHandle);
+    fseek((FILE *)pJPEG->JPEGFile.fHandle, 0, SEEK_SET);
+    return JPEGInit(pJPEG);
+} /* JPEG_openFile() */
+
 int JPEG_getWidth(JPEGIMAGE *pJPEG)
 {
     return pJPEG->iWidth;
@@ -552,6 +577,37 @@ JPEG_STATIC int32_t seekMem(JPEGFILE *pFile, int32_t iPosition)
     return iPosition;
 } /* seekMem() */
 
+#ifdef __LINUX__
+
+JPEG_STATIC void closeFile(void *handle)
+{
+    fclose((FILE *)handle);
+} /* closeFile() */
+
+JPEG_STATIC int32_t seekFile(JPEGFILE *pFile, int32_t iPosition)
+{
+    if (iPosition < 0) iPosition = 0;
+    else if (iPosition >= pFile->iSize) iPosition = pFile->iSize-1;
+    pFile->iPos = iPosition;
+    fseek((FILE *)pFile->fHandle, iPosition, SEEK_SET);
+    return iPosition;
+} /* seekMem() */
+
+JPEG_STATIC int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
+{
+    int32_t iBytesRead;
+
+    iBytesRead = iLen;
+    if ((pFile->iSize - pFile->iPos) < iLen)
+       iBytesRead = pFile->iSize - pFile->iPos;
+    if (iBytesRead <= 0)
+       return 0;
+    iBytesRead = (int)fread(pBuf, 1, iBytesRead, (FILE *)pFile->fHandle);
+    pFile->iPos += iBytesRead;
+    return iBytesRead;
+} /* readFile() */
+
+#endif // __LINUX__
 //
 // The following functions are written in plain C and have no
 // 3rd party dependencies, not even the C runtime library

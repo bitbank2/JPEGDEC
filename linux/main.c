@@ -1,5 +1,9 @@
 // JPEG perf test
 // Written by Larry Bank
+// 
+// Will open an arbitrary JPEG file if passed on the command line
+// or will use the sample image (tulips)
+//
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
@@ -26,8 +30,13 @@ void JPEGDraw(JPEGDRAW *pDraw)
 int main(int argc, char *argv[])
 {
 long lTime;
+int rc;
 
-    if (JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw))
+    if (argc == 2)
+        rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
+    else
+	rc = JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
+    if (rc)
     {
         lTime = micros();
 	if (JPEG_decode(&jpg, 0, 0, 0)) { // full size
@@ -37,7 +46,11 @@ long lTime;
 	JPEG_close(&jpg);
     }
 
-    if (JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw))
+    if (argc == 2)
+        rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
+    else
+        rc = JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
+    if (rc)
     {
         lTime = micros();
         if (JPEG_decode(&jpg, 0, 0, JPEG_SCALE_HALF)) { // 1/2 size
@@ -46,7 +59,11 @@ long lTime;
         }
         JPEG_close(&jpg);
     }
-    if (JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw))
+    if (argc == 2)
+        rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
+    else
+        rc = JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
+    if (rc)
     {
         lTime = micros();
         if (JPEG_decode(&jpg, 0, 0, JPEG_SCALE_QUARTER)) { // 1/4 size
@@ -55,7 +72,11 @@ long lTime;
         }
         JPEG_close(&jpg);
     }
-    if (JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw))
+    if (argc == 2)
+        rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
+    else
+        rc = JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
+    if (rc)
     {
         lTime = micros();
         if (JPEG_decode(&jpg, 0, 0, JPEG_SCALE_EIGHTH)) { // 1/8 size
