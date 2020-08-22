@@ -220,6 +220,15 @@ int JPEG_getHeight(JPEGIMAGE *pJPEG);
 int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions);
 void JPEG_close(JPEGIMAGE *pJPEG);
 int JPEG_getLastError(JPEGIMAGE *pJPEG);
+int JPEG_getOrientation(JPEGIMAGE *pJPEG);
+int JPEG_getBpp(JPEGIMAGE *pJPEG);
+int JPEG_getSubSample(JPEGIMAGE *pJPEG);
+int JPEG_hasThumb(JPEGIMAGE *pJPEG);
+int JPEG_getThumbWidth(JPEGIMAGE *pJPEG);
+int JPEG_getThumbHeight(JPEGIMAGE *pJPEG);
+int JPEG_getLastError(JPEGIMAGE *pJPEG);
+void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType); // defaults to little endian
+void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs);
 #endif // __cplusplus
 
 // Due to unaligned memory causing an exception, we have to do these macros the slow way

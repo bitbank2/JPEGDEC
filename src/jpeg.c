@@ -529,6 +529,42 @@ int JPEG_getHeight(JPEGIMAGE *pJPEG)
     return pJPEG->iHeight;
 } /* JPEG_getHeight() */
 
+int JPEG_getOrientation(JPEGIMAGE *pJPEG)
+{
+    return (int)pJPEG->ucOrientation;
+} /* JPEG_getOrientation() */
+
+int JPEG_getBpp(JPEGIMAGE *pJPEG)
+{
+    return (int)pJPEG->ucBpp;
+} /* JPEG_getBpp() */
+int JPEG_getSubSample(JPEGIMAGE *pJPEG)
+{
+    return (int)pJPEG->ucSubSample;
+} /* JPEG_getSubSample() */
+int JPEG_hasThumb(JPEGIMAGE *pJPEG)
+{
+    return (int)pJPEG->ucHasThumb;
+} /* JPEG_hasThumb() */
+int JPEG_getThumbWidth(JPEGIMAGE *pJPEG)
+{
+    return pJPEG->iThumbWidth;
+} /* JPEG_getThumbWidth() */
+int JPEG_getThumbHeight(JPEGIMAGE *pJPEG)
+{
+    return pJPEG->iThumbHeight;
+} /* JPEG_getThumbHeight() */
+void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType)
+{
+    pJPEG->ucPixelType = (uint8_t)iType;
+} /* JPEG_setPixelType() */
+void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs)
+{
+    if (iMaxMCUs < 1)
+        iMaxMCUs = 1; // don't allow invalid value
+    pJPEG->iMaxMCUs = iMaxMCUs;
+} /* JPEG_setMaxOutputSize() */
+
 int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions)
 {
     pJPEG->iXOffset = x;
