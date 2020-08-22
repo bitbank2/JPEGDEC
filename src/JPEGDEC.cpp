@@ -905,7 +905,7 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
     iMaxMask = 0x7f; // lower 7 bits after truncate 5 leading 1's
     for (iTable = 0; iTable < 4; iTable++)
     {
-        if (pJPEG->ucHuffTableUsed && (1 << iTable))
+        if (pJPEG->ucHuffTableUsed & (1 << iTable))
         {
             //         pJPEG->huffdcFast[iTable] = (int *)PILIOAlloc(0x180); // short table = 128 bytes, long table = 256 bytes
             pucShort = &pJPEG->ucHuffDC[iTable*DC_TABLE_SIZE];
