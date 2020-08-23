@@ -23,15 +23,15 @@
 #include "JPEGDEC.h"
 
 // forward references
-JPEG_STATIC int JPEGInit(JPEGIMAGE *pJPEG);
-JPEG_STATIC int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb);
+static int JPEGInit(JPEGIMAGE *pJPEG);
+static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb);
 static void JPEGGetMoreData(JPEGIMAGE *pPage);
-JPEG_STATIC int DecodeJPEG(JPEGIMAGE *pImage);
-JPEG_STATIC int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
-JPEG_STATIC int32_t seekMem(JPEGFILE *pFile, int32_t iPosition);
-JPEG_STATIC int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
-JPEG_STATIC int32_t seekFile(JPEGFILE *pFile, int32_t iPosition);
-JPEG_STATIC void closeFile(void *handle);
+static int DecodeJPEG(JPEGIMAGE *pImage);
+static int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
+static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition);
+static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
+static int32_t seekFile(JPEGFILE *pFile, int32_t iPosition);
+static void closeFile(void *handle);
 
 /* JPEG tables */
 // zigzag ordering of DCT coefficients
@@ -582,7 +582,7 @@ void JPEG_close(JPEGIMAGE *pJPEG)
 //
 // Helper functions for memory based images
 //
-JPEG_STATIC int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
+static int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
     int32_t iBytesRead;
 
@@ -596,7 +596,7 @@ JPEG_STATIC int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
     return iBytesRead;
 } /* readRAM() */
 
-JPEG_STATIC int32_t readFLASH(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
+static int32_t readFLASH(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
     int32_t iBytesRead;
 
@@ -610,7 +610,7 @@ JPEG_STATIC int32_t readFLASH(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
     return iBytesRead;
 } /* readFLASH() */
 
-JPEG_STATIC int32_t seekMem(JPEGFILE *pFile, int32_t iPosition)
+static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition)
 {
     if (iPosition < 0) iPosition = 0;
     else if (iPosition >= pFile->iSize) iPosition = pFile->iSize-1;
@@ -618,14 +618,14 @@ JPEG_STATIC int32_t seekMem(JPEGFILE *pFile, int32_t iPosition)
     return iPosition;
 } /* seekMem() */
 
-#ifdef __LINUX__
+#if defined( __LINUX__ ) || defined( __MCUXPRESSO )
 
-JPEG_STATIC void closeFile(void *handle)
+static void closeFile(void *handle)
 {
     fclose((FILE *)handle);
 } /* closeFile() */
 
-JPEG_STATIC int32_t seekFile(JPEGFILE *pFile, int32_t iPosition)
+static int32_t seekFile(JPEGFILE *pFile, int32_t iPosition)
 {
     if (iPosition < 0) iPosition = 0;
     else if (iPosition >= pFile->iSize) iPosition = pFile->iSize-1;
@@ -634,7 +634,7 @@ JPEG_STATIC int32_t seekFile(JPEGFILE *pFile, int32_t iPosition)
     return iPosition;
 } /* seekMem() */
 
-JPEG_STATIC int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
+static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
     int32_t iBytesRead;
 
@@ -658,7 +658,7 @@ JPEG_STATIC int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 // returns 1 for success, 0 for failure
 // Fills in the basic image info fields of the JPEGIMAGE structure
 //
-JPEG_STATIC int JPEGInit(JPEGIMAGE *pJPEG)
+static int JPEGInit(JPEGIMAGE *pJPEG)
 {
     return JPEGParseInfo(pJPEG, 0); // gather info for image
 } /* JPEGInit() */
@@ -1323,7 +1323,7 @@ static void JPEGGetMoreData(JPEGIMAGE *pPage)
 // Parse the JPEG header, gather necessary info to decode the image
 // Returns 1 for success, 0 for failure
 //
-JPEG_STATIC int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
+static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
 {
     int iBytesRead;
     int i, iOffset, iTableOffset;
@@ -2868,7 +2868,7 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
 // Decode the image
 // returns 0 for error, 1 for success
 //
-JPEG_STATIC int DecodeJPEG(JPEGIMAGE *pJPEG)
+static int DecodeJPEG(JPEGIMAGE *pJPEG)
 {
     int cx, cy, x, y, mcuCX, mcuCY;
     int iLum0, iLum1, iLum2, iLum3, iCr, iCb;
