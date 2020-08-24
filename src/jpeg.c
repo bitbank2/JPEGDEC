@@ -2453,13 +2453,13 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
             {
                 if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
                 {
-                    JPEGPixel2LE(pOutput + (iCol<<1), Y1, Y2, Cb, Cr);
-                    JPEGPixel2LE(pOutput+iPitch + (iCol<<1), Y3, Y4, Cb, Cr);
+                    JPEGPixel2BE(pOutput + (iCol<<1), Y1, Y2, Cb, Cr);
+                    JPEGPixel2BE(pOutput+iPitch + (iCol<<1), Y3, Y4, Cb, Cr);
                 }
                 else
                 {
-                    JPEGPixelLE(pOutput + (iCol<<1), Y1, Cb, Cr);
-                    JPEGPixelLE(pOutput+iPitch + (iCol<<1), Y3, Cb, Cr);
+                    JPEGPixelBE(pOutput + (iCol<<1), Y1, Cb, Cr);
+                    JPEGPixelBE(pOutput+iPitch + (iCol<<1), Y3, Cb, Cr);
                 }
             }
             // for top right block
