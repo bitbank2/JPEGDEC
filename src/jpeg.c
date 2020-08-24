@@ -470,7 +470,7 @@ static const uint16_t usRangeTableB[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x00
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-#ifndef __cplusplus
+#if defined( __LINUX__ ) || defined( __MCUXPRESSO )
 //
 // API for C
 //
@@ -1313,7 +1313,7 @@ static void JPEGGetMoreData(JPEGIMAGE *pPage)
     {
         int i;
         // Try to read enough to fill the buffer
-        i = (*pPage->pfnRead)(&pPage->JPEGFile, &pPage->ucFileBuf[pPage->iVLCSize], FILE_BUF_SIZE - pPage->iVLCSize); // max length we can read
+        i = (*pPage->pfnRead)(&pPage->JPEGFile, &pPage->ucFileBuf[pPage->iVLCSize], JPEG_FILE_BUF_SIZE - pPage->iVLCSize); // max length we can read
         // Filter out the markers
         pPage->iVLCSize += JPEGFilter(&pPage->ucFileBuf[pPage->iVLCSize], &pPage->ucFileBuf[pPage->iVLCSize], i, &pPage->ucFF);
     }
@@ -1336,7 +1336,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
         iFilePos = pPage->iThumbData;
         (*pPage->pfnSeek)(&pPage->JPEGFile, iFilePos);
     }
-    iBytesRead = (*pPage->pfnRead)(&pPage->JPEGFile, s, FILE_BUF_SIZE);
+    iBytesRead = (*pPage->pfnRead)(&pPage->JPEGFile, s, JPEG_FILE_BUF_SIZE);
     if (iBytesRead < 256) // a JPEG file this tiny? probably bad
     {
         pPage->iError = JPEG_INVALID_FILE;
@@ -1352,10 +1352,10 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
     usMarker = 0; /* Search for SOFx (start of frame) marker */
     while (usMarker != 0xffda && iOffset < pPage->JPEGFile.iSize)
     {
-        if (iOffset >= FILE_BUF_SIZE/2) // too close to the end, read more data
+        if (iOffset >= JPEG_FILE_BUF_SIZE/2) // too close to the end, read more data
         {
             // Do we need to seek first?
-            if (iOffset >= FILE_BUF_SIZE)
+            if (iOffset >= JPEG_FILE_BUF_SIZE)
             {
                 iFilePos += (iOffset - iBytesRead);
                 iOffset = 0;
@@ -1369,7 +1369,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                 iBytesRead -= iOffset;
                 iOffset = 0;
             }
-            i = (*pPage->pfnRead)(&pPage->JPEGFile, &pPage->ucFileBuf[iBytesRead], FILE_BUF_SIZE-iBytesRead);
+            i = (*pPage->pfnRead)(&pPage->JPEGFile, &pPage->ucFileBuf[iBytesRead], JPEG_FILE_BUF_SIZE-iBytesRead);
             iFilePos += i;
             iBytesRead += i;
         }

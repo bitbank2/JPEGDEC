@@ -34,7 +34,7 @@
 
 /* Defines and variables */
 #define FILE_HIGHWATER 1536
-#define FILE_BUF_SIZE 2048
+#define JPEG_FILE_BUF_SIZE 2048
 #define HUFF_TABLEN  273
 #define HUFF11SIZE (1<<11)
 #define DC_TABLE_SIZE 1024
@@ -178,7 +178,7 @@ typedef struct jpeg_image_tag
     uint16_t usPixels[MAX_BUFFERED_PIXELS];
     int16_t sMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
     int16_t sQuantTable[DCTSIZE*4]; // quantization tables
-    uint8_t ucFileBuf[FILE_BUF_SIZE]; // holds temp data and pixel stack
+    uint8_t ucFileBuf[JPEG_FILE_BUF_SIZE]; // holds temp data and pixel stack
     uint8_t ucHuffDC[DC_TABLE_SIZE * 2]; // up to 2 'short' tables
     uint16_t usHuffAC[HUFF11SIZE * 2];
 } JPEGIMAGE;

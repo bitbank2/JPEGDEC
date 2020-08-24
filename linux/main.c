@@ -32,6 +32,10 @@ int main(int argc, char *argv[])
 long lTime;
 int rc;
 
+    printf("JPEG decoder demo\n");
+    printf("Run without parameters to test in-memory decoding\n");
+    printf("Or pass a filename\n\n");
+
     if (argc == 2)
         rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
     else
