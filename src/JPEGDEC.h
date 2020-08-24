@@ -13,7 +13,7 @@
 //
 #ifndef __JPEGDEC__
 #define __JPEGDEC__
-#if defined( __MACH__ ) || defined( __LINUX__ )
+#if defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO )
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -34,7 +34,7 @@
 
 /* Defines and variables */
 #define FILE_HIGHWATER 1536
-#define FILE_BUF_SIZE 2048
+#define JPEG_FILE_BUF_SIZE 2048
 #define HUFF_TABLEN  273
 #define HUFF11SIZE (1<<11)
 #define DC_TABLE_SIZE 1024
@@ -178,11 +178,13 @@ typedef struct jpeg_image_tag
     uint16_t usPixels[MAX_BUFFERED_PIXELS];
     int16_t sMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
     int16_t sQuantTable[DCTSIZE*4]; // quantization tables
-    uint8_t ucFileBuf[FILE_BUF_SIZE]; // holds temp data and pixel stack
+    uint8_t ucFileBuf[JPEG_FILE_BUF_SIZE]; // holds temp data and pixel stack
     uint8_t ucHuffDC[DC_TABLE_SIZE * 2]; // up to 2 'short' tables
     uint16_t usHuffAC[HUFF11SIZE * 2];
 } JPEGIMAGE;
 
+#ifdef __cplusplus
+#define JPEG_STATIC static
 //
 // The JPEGDEC class wraps portable C code which does the actual work
 //
@@ -209,6 +211,25 @@ class JPEGDEC
   private:
     JPEGIMAGE _jpeg;
 };
+#else
+#define JPEG_STATIC
+int JPEG_openRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
+int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw);
+int JPEG_getWidth(JPEGIMAGE *pJPEG);
+int JPEG_getHeight(JPEGIMAGE *pJPEG);
+int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions);
+void JPEG_close(JPEGIMAGE *pJPEG);
+int JPEG_getLastError(JPEGIMAGE *pJPEG);
+int JPEG_getOrientation(JPEGIMAGE *pJPEG);
+int JPEG_getBpp(JPEGIMAGE *pJPEG);
+int JPEG_getSubSample(JPEGIMAGE *pJPEG);
+int JPEG_hasThumb(JPEGIMAGE *pJPEG);
+int JPEG_getThumbWidth(JPEGIMAGE *pJPEG);
+int JPEG_getThumbHeight(JPEGIMAGE *pJPEG);
+int JPEG_getLastError(JPEGIMAGE *pJPEG);
+void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType); // defaults to little endian
+void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs);
+#endif // __cplusplus
 
 // Due to unaligned memory causing an exception, we have to do these macros the slow way
 #define INTELSHORT(p) ((*p) + (*(p+1)<<8))
