@@ -605,7 +605,11 @@ static int32_t readFLASH(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
        iBytesRead = pFile->iSize - pFile->iPos;
     if (iBytesRead <= 0)
        return 0;
+#ifdef ARDUINO_ARCH_ESP8266
     memcpy_P(pBuf, &pFile->pData[pFile->iPos], iBytesRead);
+#else
+    memcpy(pBuf, &pFile->pData[pFile->iPos], iBytesRead);
+#endif
     pFile->iPos += iBytesRead;
     return iBytesRead;
 } /* readFLASH() */
