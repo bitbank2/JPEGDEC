@@ -1981,34 +1981,209 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
     
     pDest = (uint8_t *)&pJPEG->usPixels[x/2];
     
-    if (pJPEG->iOptions & JPEG_SCALE_HALF) // special handling of 1/2 size (pixel averaging)
+    if (pJPEG->ucSubSample <= 0x11) // single Y 
     {
-        int pix;
-        for (i=0; i<4; i++)
+        if (pJPEG->iOptions & JPEG_SCALE_HALF) // special handling of 1/2 size (pixel averaging)
         {
-            for (j=0; j<4; j++)
+            int pix;
+            for (i=0; i<4; i++)
             {
-                pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 2) >> 2; // average 2x2 block
-                pDest[i] = (uint8_t)pix;
-                pSrc += 2;
+                for (j=0; j<4; j++)
+                {
+                    pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 2) >> 2; // average 2x2 block
+                    pDest[i] = (uint8_t)pix;
+                    pSrc += 2;
+                }
+                pSrc += 8; // skip extra line
+                pDest += iPitch;
             }
-            pSrc += 8; // skip extra line
-            pDest += iPitch;
+            return;
+        }
+        xcount = ycount = 8; // debug
+        if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+            xcount = ycount = 2;
+        else if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
+            xcount = ycount = 1;
+        for (i=0; i<ycount; i++) // do up to 8 rows
+        {
+            for (j=0; j<xcount; j++)
+                *pDest++ = *pSrc++;
+            pDest -= xcount;
+            pDest += iPitch; // next line
         }
         return;
-    }
-    xcount = ycount = 8; // debug
-    if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
-        xcount = ycount = 2;
-    else if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
-        xcount = ycount = 1;
-    for (i=0; i<ycount; i++) // do up to 8 rows
+    } // single Y source
+    if (pJPEG->ucSubSample == 0x21) // stacked horizontally
     {
-        for (j=0; j<xcount; j++)
-            *pDest++ = *pSrc++;
-        pDest -= xcount;
-        pDest += iPitch; // next line
-    }
+        if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
+        {
+            // only 2 pixels emitted
+            pDest[0] = pSrc[0];
+            pDest[1] = pSrc[128];
+            return;
+        } /* 1/8 */
+        if (pJPEG->iOptions & JPEG_SCALE_HALF)
+        {
+            for (i=0; i<4; i++)
+            {
+                for (j=0; j<4; j++)
+                {
+                    int pix;
+                    pix = (pSrc[j*2] + pSrc[j*2+1] + pSrc[j*2 + 8] + pSrc[j*2 + 9] + 3) >> 2;
+                    pDest[j] = (uint8_t)pix;
+                    pix = (pSrc[j*2 + 128] + pSrc[j*2+129] + pSrc[j*2 + 136] + pSrc[j*2 + 137] + 3) >> 2;
+                    pDest[j+4] = (uint8_t)pix;
+                }
+                pSrc += 16;
+                pDest += iPitch;
+            }
+            return;
+        }
+        if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+        {
+            // each MCU contributes a 2x2 block
+            pDest[0] = pSrc[0]; // Y0
+            pDest[1] = pSrc[1];
+            pDest[iPitch] = pSrc[2];
+            pDest[iPitch+1] = pSrc[3];
+
+            pDest[2] = pSrc[128]; // Y`
+            pDest[3] = pSrc[129];
+            pDest[iPitch+2] = pSrc[130];
+            pDest[iPitch+3] = pSrc[131];
+            return;
+        }
+        for (i=0; i<8; i++)
+        {
+            for (j=0; j<8; j++)
+            {
+                pDest[j] = pSrc[j];
+                pDest[j+8] = pSrc[128 + j];
+            }
+            pSrc += 8;
+            pDest += iPitch;
+        }
+    } // 0x21
+    if (pJPEG->ucSubSample == 0x12) // stacked vertically
+    {
+        if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
+        {
+            // only 2 pixels emitted
+            pDest[0] = pSrc[0];
+            pDest[iPitch] = pSrc[128];
+            return;
+        } /* 1/8 */
+        if (pJPEG->iOptions & JPEG_SCALE_HALF)
+        {
+            for (i=0; i<4; i++)
+            {
+                for (j=0; j<4; j++)
+                {
+                    int pix;
+                    pix = (pSrc[j*2] + pSrc[j*2+1] + pSrc[j*2 + 8] + pSrc[j*2 + 9] + 3) >> 2;
+                    pDest[j] = (uint8_t)pix;
+                    pix = (pSrc[j*2 + 128] + pSrc[j*2+129] + pSrc[j*2 + 136] + pSrc[j*2 + 137] + 3) >> 2;
+                    pDest[4*iPitch+j] = (uint8_t)pix;
+                }
+                pSrc += 16;
+                pDest += iPitch;
+            }
+            return;
+        }
+        if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+        {
+            // each MCU contributes a 2x2 block
+            pDest[0] = pSrc[0]; // Y0
+            pDest[1] = pSrc[1];
+            pDest[iPitch] = pSrc[2];
+            pDest[iPitch+1] = pSrc[3];
+
+            pDest[iPitch*2] = pSrc[128]; // Y`
+            pDest[iPitch*2+1] = pSrc[129];
+            pDest[iPitch*3] = pSrc[130];
+            pDest[iPitch*3+1] = pSrc[131];
+            return;
+        }
+        for (i=0; i<8; i++)
+        {
+            for (j=0; j<8; j++)
+            {
+                pDest[j] = pSrc[j];
+                pDest[8*iPitch + j] = pSrc[128 + j];
+            }
+            pSrc += 8;
+            pDest += iPitch;
+        }
+    } // 0x12
+    if (pJPEG->ucSubSample == 0x22)
+    {
+        if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
+        {
+            // each MCU contributes 1 pixel
+            pDest[0] = pSrc[0]; // Y0
+            pDest[1] = pSrc[128]; // Y1
+            pDest[iPitch] = pSrc[256]; // Y2
+            pDest[iPitch + 1] = pSrc[384]; // Y3
+            return;
+        }
+        if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+        {
+            // each MCU contributes 2x2 pixels
+            pDest[0] = pSrc[0]; // Y0
+            pDest[1] = pSrc[1];
+            pDest[iPitch] = pSrc[2];
+            pDest[iPitch+1] = pSrc[3];
+            
+            pDest[2] = pSrc[128]; // Y1
+            pDest[3] = pSrc[129];
+            pDest[iPitch+2] = pSrc[130];
+            pDest[iPitch+3] = pSrc[131];
+            
+            pDest[iPitch*2] = pSrc[256]; // Y2
+            pDest[iPitch*2+1] = pSrc[257];
+            pDest[iPitch*3] = pSrc[258];
+            pDest[iPitch*3+1] = pSrc[259];
+            
+            pDest[iPitch*2+2] = pSrc[384]; // Y3
+            pDest[iPitch*2+3] = pSrc[385];
+            pDest[iPitch*3+2] = pSrc[386];
+            pDest[iPitch*3+3] = pSrc[387];
+            return;
+        }
+        if (pJPEG->iOptions & JPEG_SCALE_HALF)
+        {
+            for (i=0; i<4; i++)
+            {
+                for (j=0; j<4; j++)
+                {
+                    int pix;
+                    pix = (pSrc[j*2] + pSrc[j*2+1] + pSrc[j*2 + 8] + pSrc[j*2 + 9] + 3) >> 2;
+                    pDest[j] = (uint8_t)pix; // Y0
+                    pix = (pSrc[j*2+128] + pSrc[j*2+129] + pSrc[j*2 + 136] + pSrc[j*2 + 137] + 3) >> 2;
+                    pDest[j+4] = (uint8_t)pix; // Y1
+                    pix = (pSrc[j*2+256] + pSrc[j*2+257] + pSrc[j*2 + 264] + pSrc[j*2 + 265] + 3) >> 2;
+                    pDest[iPitch*4 + j] = (uint8_t)pix; // Y2
+                    pix = (pSrc[j*2+384] + pSrc[j*2+385] + pSrc[j*2 + 392] + pSrc[j*2 + 393] + 3) >> 2;
+                    pDest[iPitch*4 + j + 4] = (uint8_t)pix; // Y3
+                }
+                pSrc += 16;
+                pDest += iPitch;
+            }
+            return;
+        }
+        for (i=0; i<8; i++)
+        {
+            for (j=0; j<8; j++)
+            {
+                pDest[j] = pSrc[j]; // Y0
+                pDest[j+8] = pSrc[j+128]; // Y1
+                pDest[iPitch*8 + j] = pSrc[j+256]; // Y2
+                pDest[iPitch*8 + j + 8] = pSrc[j + 384]; // Y3
+            }
+            pSrc += 8;
+            pDest += iPitch;
+        }
+    } // 0x22
 } /* JPEGMPutMCU8BitGray() */
 
 static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)

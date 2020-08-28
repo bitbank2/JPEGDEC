@@ -40,7 +40,7 @@ void setup() {
 // Functions to access a file on the SD card
 File myfile;
 
-void * myOpen(char *filename, int32_t *size) {
+void * myOpen(const char *filename, int32_t *size) {
   myfile = SD.open(filename);
   *size = myfile.size();
   return &myfile;
@@ -80,7 +80,7 @@ void loop() {
         Serial.println(name);
         tft.print("File: ");
         tft.println(name);
-        jpeg.open((char *)name, myOpen, myClose, myRead, mySeek, JPEGDraw);
+        jpeg.open((const char *)name, myOpen, myClose, myRead, mySeek, JPEGDraw);
         jpeg.decode(0, 0, 0);
         jpeg.close();
         filecount = filecount + 1;
