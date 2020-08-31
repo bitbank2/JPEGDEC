@@ -33,7 +33,10 @@ JPEG_STATIC int DecodeJPEG(JPEGIMAGE *pImage);
 
 void JPEGDEC::setPixelType(int iType)
 {
-    _jpeg.ucPixelType = (uint8_t)iType;
+    if (iType >= 0 && iType < INVALID_PIXEL_TYPE)
+        _jpeg.ucPixelType = (uint8_t)iType;
+    else
+        _jpeg.iError = JPEG_INVALID_PARAMETER;
 } /* setPixelType() */
 
 void JPEGDEC::setMaxOutputSize(int iMaxMCUs)
@@ -158,3 +161,10 @@ int JPEGDEC::decode(int x, int y, int iOptions)
     _jpeg.iOptions = iOptions;
     return DecodeJPEG(&_jpeg);
 } /* decode() */
+
+int JPEGDEC::decodeDither(uint8_t *pDither, int iOptions)
+{
+    _jpeg.iOptions = iOptions;
+    _jpeg.pDitherBuffer = pDither;
+    return DecodeJPEG(&_jpeg);
+}

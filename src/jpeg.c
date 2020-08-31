@@ -32,7 +32,7 @@ static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition);
 static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
 static int32_t seekFile(JPEGFILE *pFile, int32_t iPosition);
 static void closeFile(void *handle);
-
+static void JPEGDither(JPEGIMAGE *pJPEG, int iWidth, int iHeight);
 /* JPEG tables */
 // zigzag ordering of DCT coefficients
 static const unsigned char cZigZag[64] = {0,1,5,6,14,15,27,28,
@@ -572,6 +572,14 @@ int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions)
     pJPEG->iOptions = iOptions;
     return DecodeJPEG(pJPEG);
 } /* JPEG_decode() */
+
+int JPEG_decodeDither(JPEGIMAGE *pJPEG, uint8_t *pDither, int iOptions)
+{
+    pJPEG->iOptions = iOptions;
+    pJPEG->pDitherBuffer = pDither;
+    return DecodeJPEG(pJPEG);
+} /* JPEG_decodeDither() */
+
 void JPEG_close(JPEGIMAGE *pJPEG)
 {
     if (pJPEG->pfnClose)
@@ -1979,7 +1987,10 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
     int i, j, xcount, ycount;
     uint8_t *pDest, *pSrc = (uint8_t *)&pJPEG->sMCUs[0];
     
-    pDest = (uint8_t *)&pJPEG->usPixels[x/2];
+    if (pJPEG->pDitherBuffer)
+        pDest = &pJPEG->pDitherBuffer[x];
+    else
+        pDest = (uint8_t *)&pJPEG->usPixels[x/2];
     
     if (pJPEG->ucSubSample <= 0x11) // single Y 
     {
@@ -1991,7 +2002,7 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
                 for (j=0; j<4; j++)
                 {
                     pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 2) >> 2; // average 2x2 block
-                    pDest[i] = (uint8_t)pix;
+                    pDest[j] = (uint8_t)pix;
                     pSrc += 2;
                 }
                 pSrc += 8; // skip extra line
@@ -2029,9 +2040,9 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
                 for (j=0; j<4; j++)
                 {
                     int pix;
-                    pix = (pSrc[j*2] + pSrc[j*2+1] + pSrc[j*2 + 8] + pSrc[j*2 + 9] + 3) >> 2;
+                    pix = (pSrc[j*2] + pSrc[j*2+1] + pSrc[j*2 + 8] + pSrc[j*2 + 9] + 2) >> 2;
                     pDest[j] = (uint8_t)pix;
-                    pix = (pSrc[j*2 + 128] + pSrc[j*2+129] + pSrc[j*2 + 136] + pSrc[j*2 + 137] + 3) >> 2;
+                    pix = (pSrc[j*2 + 128] + pSrc[j*2+129] + pSrc[j*2 + 136] + pSrc[j*2 + 137] + 2) >> 2;
                     pDest[j+4] = (uint8_t)pix;
                 }
                 pSrc += 16;
@@ -2080,9 +2091,9 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
                 for (j=0; j<4; j++)
                 {
                     int pix;
-                    pix = (pSrc[j*2] + pSrc[j*2+1] + pSrc[j*2 + 8] + pSrc[j*2 + 9] + 3) >> 2;
+                    pix = (pSrc[j*2] + pSrc[j*2+1] + pSrc[j*2 + 8] + pSrc[j*2 + 9] + 2) >> 2;
                     pDest[j] = (uint8_t)pix;
-                    pix = (pSrc[j*2 + 128] + pSrc[j*2+129] + pSrc[j*2 + 136] + pSrc[j*2 + 137] + 3) >> 2;
+                    pix = (pSrc[j*2 + 128] + pSrc[j*2+129] + pSrc[j*2 + 136] + pSrc[j*2 + 137] + 2) >> 2;
                     pDest[4*iPitch+j] = (uint8_t)pix;
                 }
                 pSrc += 16;
@@ -2157,13 +2168,13 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
                 for (j=0; j<4; j++)
                 {
                     int pix;
-                    pix = (pSrc[j*2] + pSrc[j*2+1] + pSrc[j*2 + 8] + pSrc[j*2 + 9] + 3) >> 2;
+                    pix = (pSrc[j*2] + pSrc[j*2+1] + pSrc[j*2 + 8] + pSrc[j*2 + 9] + 2) >> 2;
                     pDest[j] = (uint8_t)pix; // Y0
-                    pix = (pSrc[j*2+128] + pSrc[j*2+129] + pSrc[j*2 + 136] + pSrc[j*2 + 137] + 3) >> 2;
+                    pix = (pSrc[j*2+128] + pSrc[j*2+129] + pSrc[j*2 + 136] + pSrc[j*2 + 137] + 2) >> 2;
                     pDest[j+4] = (uint8_t)pix; // Y1
-                    pix = (pSrc[j*2+256] + pSrc[j*2+257] + pSrc[j*2 + 264] + pSrc[j*2 + 265] + 3) >> 2;
+                    pix = (pSrc[j*2+256] + pSrc[j*2+257] + pSrc[j*2 + 264] + pSrc[j*2 + 265] + 2) >> 2;
                     pDest[iPitch*4 + j] = (uint8_t)pix; // Y2
-                    pix = (pSrc[j*2+384] + pSrc[j*2+385] + pSrc[j*2 + 392] + pSrc[j*2 + 393] + 3) >> 2;
+                    pix = (pSrc[j*2+384] + pSrc[j*2+385] + pSrc[j*2 + 392] + pSrc[j*2 + 393] + 2) >> 2;
                     pDest[iPitch*4 + j + 4] = (uint8_t)pix; // Y3
                 }
                 pSrc += 16;
@@ -3039,6 +3050,81 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
         pOutput += iPitch;
     } // for row
 } /* JPEGPutMCU21() */
+
+// Dither the 8-bit gray pixels into 1, 2, or 4-bit gray
+static void JPEGDither(JPEGIMAGE *pJPEG, int iWidth, int iHeight)
+{
+int x, y, xmask=0, iDestPitch=0;
+int32_t cNew, lFErr, v=0, h;
+int32_t e1,e2,e3,e4;
+uint8_t cOut, ucPixelType; // forward errors for gray
+uint8_t *pSrc, *pDest, *errors, *pErrors=NULL, *d, *pPixels; // destination 8bpp image
+uint8_t pixelmask=0, shift=0;
+    
+    ucPixelType = pJPEG->ucPixelType;
+    errors = (uint8_t *)&pJPEG->usPixels[MAX_BUFFERED_PIXELS/2]; // plenty of space here
+    errors[0] = errors[1] = errors[2] = 0;
+    pDest = pSrc = pJPEG->pDitherBuffer; // write the new pixels over the original
+    switch (ucPixelType)
+    {
+        case FOUR_BIT_DITHERED:
+            iDestPitch = (iWidth+1)/2;
+            pixelmask = 0xf0;
+            shift = 4;
+            xmask = 1;
+            break;
+        case TWO_BIT_DITHERED:
+            iDestPitch = (iWidth+3)/4;
+            pixelmask = 0xc0;
+            shift = 2;
+            xmask = 3;
+            break;
+        case ONE_BIT_DITHERED:
+            iDestPitch = (iWidth+7)/8;
+            pixelmask = 0x80;
+            shift = 1;
+            xmask = 7;
+            break;
+    }
+    for (y=0; y<iHeight; y++)
+    {
+        pPixels = &pSrc[y * iWidth];
+        d = &pDest[y * iDestPitch];
+        pErrors = &errors[1]; // point to second pixel to avoid boundary check
+        lFErr = 0;
+        cOut = 0;
+        for (x=0; x<iWidth; x++)
+        {
+            cNew = *pPixels++; // get grayscale uint8_t pixel
+            // add forward error
+            cNew += lFErr;
+            if (cNew > 255) cNew = 255;     // clip to uint8_t
+            cOut <<= shift;                 // pack new pixels into a byte
+            cOut |= (cNew >> (8-shift));    // keep top N bits
+            if ((x & xmask) == xmask)       // store it when the byte is full
+            {
+                *d++ = cOut;
+                cOut = 0;
+            }
+            // calculate the Floyd-Steinberg error for this pixel
+            v = cNew - (cNew & pixelmask); // new error for N-bit gray output (always positive)
+            h = v >> 1;
+            e1 = (7*h)>>3;  // 7/16
+            e2 = h - e1;  // 1/16
+            e3 = (5*h) >> 3;   // 5/16
+            e4 = h - e3;  // 3/16
+            // distribute error to neighbors
+            lFErr = e1 + pErrors[1];
+            pErrors[1] = (uint8_t)e2;
+            pErrors[0] += e3;
+            pErrors[-1] += e4;
+            pErrors++;
+        } // for x
+    } // for y
+    // copy the output to the pixel buffer for the user to access
+    memcpy(pJPEG->usPixels, pJPEG->pDitherBuffer, iDestPitch * iHeight);
+} /* JPEGDither() */
+
 //
 // Decode the image
 // returns 0 for error, 1 for success
@@ -3157,7 +3243,24 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         iMCUCount = cx; // don't go wider than the image
     if (iMCUCount > pJPEG->iMaxMCUs) // did the user set an upper bound on how many pixels per JPEGDraw callback?
         iMCUCount = pJPEG->iMaxMCUs;
-    jd.iBpp = (pJPEG->ucPixelType == EIGHT_BIT_GRAYSCALE) ? 8 : 16;
+    if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dithered, override the max MCU count
+        iMCUCount = cx; // do the whole row
+    jd.iBpp = 16;
+    switch (pJPEG->ucPixelType)
+    {
+        case EIGHT_BIT_GRAYSCALE:
+            jd.iBpp = 8;
+            break;
+        case FOUR_BIT_DITHERED:
+            jd.iBpp = 4;
+            break;
+        case TWO_BIT_DITHERED:
+            jd.iBpp = 2;
+            break;
+        case ONE_BIT_DITHERED:
+            jd.iBpp = 1;
+            break;
+    }
     jd.pPixels = pJPEG->usPixels;
     jd.iHeight = mcuCY;
     jd.y = pJPEG->iYOffset;
@@ -3275,7 +3378,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                     JPEGIDCT(pJPEG, iCb, pJPEG->JPCI[2].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8)));
                 }
             } // if color components present
-            if (pJPEG->ucPixelType == EIGHT_BIT_GRAYSCALE)
+            if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE)
             {
                 JPEGPutMCU8BitGray(pJPEG, xoff, iPitch);
             }
@@ -3305,6 +3408,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             {
                 xoff = 0;
                 jd.iWidth = iPitch; // width of each LCD block group
+                if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dither to 4/2/1 bits
+                    JPEGDither(pJPEG, cx * mcuCX, mcuCY);
                 (*pJPEG->pfnDraw)(&jd);
                 jd.x += iPitch;
                 if ((cx - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
