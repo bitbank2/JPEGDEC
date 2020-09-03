@@ -22,6 +22,7 @@ Features:<br>
 - Includes fast downscaling options (1/2, 1/4, 1/8).
 - Includes option to detect and decode the embedded Exif thumbnail
 - Supports Baseline Huffman images (grayscale or YCbCr)<br>
+- Includes optional Floyd-Steinberg dithering to 1, 2 or 4-bpp grayscale output; useful for e-paper displays<br>
 
 <br>
 <p align="center">
