@@ -33,6 +33,15 @@ Features:<br>
 **A note about performance**<br>
 The chart above gives you an idea of how the code performs on various MCUs with the different scaling options. The test image used is both large in dimension and large in terms of the compressed data size. The two factors that have the most influence on performance are the compressed data size and the output scaling options. This is because the time to decode JPEG data scales mostly linearly with the amount of data to decode. To get the fastest decode speed, choose the lowest acceptable quality for your image; this will produce the smallest compressed data size. When you must use an image that is too large, the scaling options allow you to display it at a lower resolution than the original.<br>
 
+<br>
+<p align="center">
+  <img width="720" height="568" src="https://github.com/bitbank2/JPEGDEC/blob/master/squirrel_dither.jpg?raw=true">
+</p>
+<br>
+
+**Floyd-Steinberg dithering**<br>
+I added the option to dither the output to 1, 2 or 4-bit per pixel grayscale using the FS error diffusion algorithm. It creates a pleasant output without visible blocking nor repeating patterns. This seemed useful for generating output suitable for high resolution e-paper displays. The image above was decoded from a 800x600 color JPEG and rendered as 2-bits per pixels (4 gray levels) on a 400x300 4.2" e-paper display. See the Wiki for info on how to use this option.
+
 Acquiring JPEG files to play:
 ----------------------------
 You'll notice that the images provided in the test_images folder have been turned into C code. Each byte is now in the form 0xAB so that it can be compiled into your program and stored in FLASH memory alongside your other code. You can use a command line tool called xxd to convert a binary file into this type of text. Make sure to add a const/PROGMEM modifier in front of the JPEG data array to ensure that it gets written to FLASH and not RAM by your build environment.
