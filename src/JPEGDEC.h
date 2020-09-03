@@ -60,10 +60,15 @@
 #define MCU5 (DCTSIZE * 5)
 
 // Pixel types (defaults to little endian RGB565)
-#define RGB565_LITTLE_ENDIAN 0
-#define RGB565_BIG_ENDIAN 1
-#define EIGHT_BIT_GRAYSCALE 2
-
+enum {
+    RGB565_LITTLE_ENDIAN = 0,
+    RGB565_BIG_ENDIAN,
+    EIGHT_BIT_GRAYSCALE,
+    FOUR_BIT_DITHERED,
+    TWO_BIT_DITHERED,
+    ONE_BIT_DITHERED,
+    INVALID_PIXEL_TYPE
+};
 
 enum {
     JPEG_MEM_RAM=0,
@@ -175,6 +180,7 @@ typedef struct jpeg_image_tag
     JPEGCOMPINFO JPCI[MAX_COMPS_IN_SCAN]; /* Max color components */
     JPEGFILE JPEGFile;
     BUFFERED_BITS bb;
+    uint8_t *pDitherBuffer; // provided externally to do Floyd-Steinberg dithering
     uint16_t usPixels[MAX_BUFFERED_PIXELS];
     int16_t sMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
     int16_t sQuantTable[DCTSIZE*4]; // quantization tables
@@ -196,6 +202,7 @@ class JPEGDEC
     int open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw);
     void close();
     int decode(int x, int y, int iOptions);
+    int decodeDither(uint8_t *pDither, int iOptions);
     int getOrientation();
     int getWidth();
     int getHeight();
@@ -218,6 +225,7 @@ int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *
 int JPEG_getWidth(JPEGIMAGE *pJPEG);
 int JPEG_getHeight(JPEGIMAGE *pJPEG);
 int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions);
+int JPEG_decodeDither(JPEGIMAGE *pJPEG, uint8_t *pDither, int iOptions);
 void JPEG_close(JPEGIMAGE *pJPEG);
 int JPEG_getLastError(JPEGIMAGE *pJPEG);
 int JPEG_getOrientation(JPEGIMAGE *pJPEG);
