@@ -640,7 +640,7 @@ static int32_t seekFile(JPEGFILE *pFile, int32_t iPosition)
     pFile->iPos = iPosition;
     fseek((FILE *)pFile->fHandle, iPosition, SEEK_SET);
     return iPosition;
-} /* seekMem() */
+} /* seekFile() */
 
 static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
@@ -1309,7 +1309,7 @@ static void JPEGGetMoreData(JPEGIMAGE *pPage)
     int iDelta = pPage->iVLCSize - pPage->iVLCOff;
 //    printf("Getting more data...size=%d, off=%d\n", pPage->iVLCSize, pPage->iVLCOff);
     // move any existing data down
-    if (iDelta >= FILE_HIGHWATER || iDelta < 0)
+    if (iDelta >= (JPEG_FILE_BUF_SIZE-64) || iDelta < 0)
         return; // buffer is already full; no need to read more data
     if (pPage->iVLCOff != 0)
     {
@@ -1318,7 +1318,7 @@ static void JPEGGetMoreData(JPEGIMAGE *pPage)
         pPage->iVLCOff = 0;
         pPage->bb.pBuf = pPage->ucFileBuf; // reset VLC source pointer too
     }
-    if (pPage->JPEGFile.iPos < pPage->JPEGFile.iSize && pPage->iVLCSize < FILE_HIGHWATER)
+    if (pPage->JPEGFile.iPos < pPage->JPEGFile.iSize && pPage->iVLCSize < JPEG_FILE_BUF_SIZE-64)
     {
         int i;
         // Try to read enough to fill the buffer
@@ -3361,10 +3361,6 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 pJPEG->ucACTable = cACTable2;
                 pJPEG->ucDCTable = cDCTable2;
                 iErr |= JPEGDecodeMCU(pJPEG, iCb, &iDCPred2);
-                if (iErr)
-                {
-                    return 0; // decoding error, stop
-                }
                 if (pJPEG->ucMaxACCol == 0 || bThumbnail) // no AC components, save some time
                 {
                     c = ucRangeTable[((iDCPred2 * iQuant3) >> 5) & 0x3ff];
