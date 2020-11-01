@@ -75,7 +75,7 @@ void loop() {
     if (entry.isDirectory() == false) {
       const char *name = entry.name();
       const int len = strlen(name);
-      if (len > 3 && strcmp(name + len - 3, "JPG") == 0) {
+      if (len > 3 && strcasecmp(name + len - 3, "JPG") == 0) {
         Serial.print("File: ");
         Serial.println(name);
         tft.print("File: ");
