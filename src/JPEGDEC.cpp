@@ -142,6 +142,35 @@ int JPEGDEC::open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOS
 
 } /* open() */
 
+#ifdef FS_H
+static int32_t FileRead(JPEGFILE *handle, uint8_t *buffer, int32_t length)
+{
+    return ((File *)(handle->fHandle))->read(buffer, length);
+}
+static int32_t FileSeek(JPEGFILE *handle, int32_t position)
+{
+    return ((File *)(handle->fHandle))->seek(position);
+}
+static void FileClose(void *handle)
+{
+    ((File *)handle)->close();
+}
+
+int JPEGDEC::open(File &file, JPEG_DRAW_CALLBACK *pfnDraw)
+{
+    if (!file) return 0;
+    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
+    _jpeg.pfnRead = FileRead;
+    _jpeg.pfnSeek = FileSeek;
+    _jpeg.pfnClose = FileClose;
+    _jpeg.pfnDraw = pfnDraw;
+    _jpeg.iMaxMCUs = 1000;
+    _jpeg.JPEGFile.fHandle = &file;
+    _jpeg.JPEGFile.iSize = file.size();
+    return JPEGInit(&_jpeg);
+}
+#endif // FS_H
+
 void JPEGDEC::close()
 {
     if (_jpeg.pfnClose)
