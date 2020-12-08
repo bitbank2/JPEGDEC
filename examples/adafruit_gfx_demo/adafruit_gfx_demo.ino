@@ -24,13 +24,14 @@
 Adafruit_ILI9341 tft(tft8bitbus, TFT_D0, TFT_WR, TFT_DC, TFT_CS, TFT_RST, TFT_RD);
 JPEGDEC jpeg;
 
-void JPEGDraw(JPEGDRAW *pDraw)
+int JPEGDraw(JPEGDRAW *pDraw)
 {
 //  Serial.printf("jpeg draw: x,y=%d,%d, cx,cy = %d,%d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
 //  Serial.printf("Pixel 0 = 0x%04x\n", pDraw->pPixels[0]);
   tft.dmaWait(); // Wait for prior writePixels() to finish
   tft.setAddrWindow(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
   tft.writePixels(pDraw->pPixels, pDraw->iWidth * pDraw->iHeight, true, false); // Use DMA, big-endian
+  return 1;
 } /* JPEGDraw() */
 
 void setup() {

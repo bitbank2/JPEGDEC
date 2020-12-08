@@ -5,9 +5,10 @@
 #include "../test_images/tulips.h" // 640x480 56k byte test image
 JPEGDEC jpeg;
 
-void JPEGDraw(JPEGDRAW *pDraw)
+int JPEGDraw(JPEGDRAW *pDraw)
 {
   // do nothing
+  return 1; // continue decode
 } /* JPEGDraw() */
 
 void setup() {

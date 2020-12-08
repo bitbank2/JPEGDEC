@@ -22,7 +22,7 @@ static uint8_t *ucTXBuf;
 
 //File file;
 // pixel drawing callback
-void drawMCU(JPEGDRAW *pDraw)
+int drawMCU(JPEGDRAW *pDraw)
 {
   int iCount = pDraw->iWidth * pDraw->iHeight;
 //  Serial.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
@@ -31,6 +31,7 @@ void drawMCU(JPEGDRAW *pDraw)
   spilcdWaitDMA();
   memcpy(ucTXBuf, pDraw->pPixels, iCount*sizeof(uint16_t));
   spilcdWriteDataDMA(iCount*2);  
+  return 1;
 } /* drawMCU() */
 
 void setup()

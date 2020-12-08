@@ -24,7 +24,7 @@ bool dither = true;
 JPEGDEC jpeg;
 Grayscale_IL0398 display(DISPLAY_WIDTH, DISPLAY_HEIGHT, EPD_DC, EPD_RST, EPD_CS, -1, EPD_BSY, EPD_DISPLAY_BUS);
 
-void JPEGDraw(JPEGDRAW *pDraw)
+int JPEGDraw(JPEGDRAW *pDraw)
 {
   int x = pDraw->x;
   int y = pDraw->y;
@@ -75,6 +75,7 @@ void JPEGDraw(JPEGDRAW *pDraw)
       } // switch
     } // for j
   } // for i
+  return 1;
 } /* JPEGDraw() */
 
 void setup() {

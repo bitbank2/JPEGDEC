@@ -3138,6 +3138,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     int i, iQuant1, iQuant2, iQuant3, iErr;
     uint8_t c;
     int iMCUCount, xoff, iPitch, bThumbnail = 0;
+    int bContinue = 1; // early exit if the DRAW callback wants to stop
     uint32_t l, *pl;
     unsigned char cDCTable0, cACTable0, cDCTable1, cACTable1, cDCTable2, cACTable2;
     JPEGDRAW jd;
@@ -3265,12 +3266,12 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     jd.pPixels = pJPEG->usPixels;
     jd.iHeight = mcuCY;
     jd.y = pJPEG->iYOffset;
-    for (y = 0; y < cy; y++, jd.y += mcuCY)
+    for (y = 0; y < cy && bContinue; y++, jd.y += mcuCY)
     {
         jd.x = pJPEG->iXOffset;
         xoff = 0; // start of new LCD output group
         iPitch = iMCUCount * mcuCX; // pixels per line of LCD buffer
-        for (x = 0; x < cx && iErr == 0; x++)
+        for (x = 0; x < cx && bContinue && iErr == 0; x++)
         {
             pJPEG->ucACTable = cACTable0;
             pJPEG->ucDCTable = cDCTable0;
@@ -3407,7 +3408,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 jd.iWidth = iPitch; // width of each LCD block group
                 if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dither to 4/2/1 bits
                     JPEGDither(pJPEG, cx * mcuCX, mcuCY);
-                (*pJPEG->pfnDraw)(&jd);
+                bContinue = (*pJPEG->pfnDraw)(&jd);
                 jd.x += iPitch;
                 if ((cx - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
                     iPitch = (cx - 1 - x) * mcuCX;

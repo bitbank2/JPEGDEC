@@ -18,13 +18,15 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
-#define memcpy_P memcpy
-#define PROGMEM
 #else
 #include <Arduino.h>
 #if defined(__has_include) && __has_include(<FS.h>)
 #include "FS.h"
 #endif
+#endif
+#ifndef PROGMEM
+#define memcpy_P memcpy
+#define PROGMEM
 #endif
 //
 // JPEG Decoder
@@ -113,7 +115,7 @@ typedef struct jpeg_draw_tag
 // Callback function prototypes
 typedef int32_t (JPEG_READ_CALLBACK)(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
 typedef int32_t (JPEG_SEEK_CALLBACK)(JPEGFILE *pFile, int32_t iPosition);
-typedef void (JPEG_DRAW_CALLBACK)(JPEGDRAW *pDraw);
+typedef int (JPEG_DRAW_CALLBACK)(JPEGDRAW *pDraw);
 typedef void * (JPEG_OPEN_CALLBACK)(const char *szFilename, int32_t *pFileSize);
 typedef void (JPEG_CLOSE_CALLBACK)(void *pHandle);
 
