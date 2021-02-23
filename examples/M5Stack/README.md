@@ -1,7 +1,7 @@
 These are slightly modified versions of the adafruit_gfx_demo.  
 Extra Images were included:  
 The Star Ship ENTERPRISE "NCC-1701" from http://clipart-library.com/clip-art/uss-enterprise-silhouette-11.htm  
-And an image of "Batman" from http://clipart-library.com/clipart/batman-clip-art_19.htm  
+And an image of "Batman" from https://all-free-download.com/free-vector/download/batman-5_132955.html  
 
 The JPEGDraw function was changed for use with the M5Stack devices.  
 
