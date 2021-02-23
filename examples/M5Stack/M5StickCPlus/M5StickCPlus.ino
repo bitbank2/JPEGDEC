@@ -8,10 +8,10 @@
 //#include "ncc1701.h" //http://clipart-library.com/clip-art/uss-enterprise-silhouette-11.htm
 //#include "batman.h" //http://clipart-library.com/clipart/batman-clip-art_19.htm
 
-#include <M5StickC.h>
+#include <M5StickCPlus.h>
 
-#define DISPLAY_WIDTH 80
-#define DISPLAY_HEIGHT 160
+#define DISPLAY_WIDTH 135
+#define DISPLAY_HEIGHT 240
 
 
 JPEGDEC jpeg;

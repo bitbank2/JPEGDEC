@@ -8,10 +8,10 @@
 //#include "ncc1701.h" //http://clipart-library.com/clip-art/uss-enterprise-silhouette-11.htm
 //#include "batman.h" //http://clipart-library.com/clipart/batman-clip-art_19.htm
 
-#include <M5StickC.h>
+#include <M5Stack.h>
 
-#define DISPLAY_WIDTH 80
-#define DISPLAY_HEIGHT 160
+#define DISPLAY_WIDTH 320
+#define DISPLAY_HEIGHT 240
 
 
 JPEGDEC jpeg;
@@ -28,7 +28,7 @@ void setup() {
   
   Serial.println("Starting...");
   
-M5.begin();
+M5.Lcd.begin();
 M5.Lcd.fillScreen(TFT_BLACK);
 } /* setup() */
 
@@ -36,8 +36,8 @@ void loop() {
 int i;
 long lTime;
 int iOption[4] = {0, JPEG_SCALE_HALF, JPEG_SCALE_QUARTER, JPEG_SCALE_EIGHTH};
-int iCenterX[4] = {0,0,0,0};
-int iCenterY[4] = {0,0,0,0};
+int iCenterX[4] = {0,80,120,140};
+int iCenterY[4] = {0,60,90,105};
 
   for (i=0; i<4; i++)
   {
