@@ -16,17 +16,17 @@ if (jpeg.openFLASH((uint8_t *)thumb_test, sizeof(thumb_test), JPEGDraw))
     //if (jpeg.openFLASH((uint8_t *)ncc1701, sizeof(ncc1701), JPEGDraw))  
     //if (jpeg.openFLASH((uint8_t *)batman, sizeof(batman), JPEGDraw))  
 
-M5Stack and M5Fire sketches are almost the same, the difference is how you start the screen on the Fire.  
+M5Stack, M5Core2 and M5Fire sketches are almost the same, the difference is how you start the screen on the Fire, and M5Core2.  
 M5StickC and M5StickCPlus are the same with the difference being which library is used (either M5StickC.h or M5StickkCPlus.h) and display size between the two devices.  
 
-Tested on:
+Tested on:  
 M5Stack Gray  
 M5Stack Fire  
 M5StickC  
 M5StickC Plus  
-
-Untested:
 M5Core2  
+
+Untested: (should work with M5Stack, but unable to test)  
 M5Stack Basic (should work)  
 M5Go Lite  
 M5Go  
