@@ -44,7 +44,7 @@ I added the option to dither the output to 1, 2 or 4-bit per pixel grayscale usi
 
 Acquiring JPEG files to play:
 ----------------------------
-You'll notice that the images provided in the test_images folder have been turned into C code. Each byte is now in the form 0xAB so that it can be compiled into your program and stored in FLASH memory alongside your other code. You can use a command line tool called xxd to convert a binary file into this type of text. Make sure to add a const/PROGMEM modifier in front of the JPEG data array to ensure that it gets written to FLASH and not RAM by your build environment.
+You'll notice that the images provided in the test_images folder have been turned into C code. Each byte is now in the form 0xAB so that it can be compiled into your program and stored in FLASH memory alongside your other code. You can use a command line tool I wrote called image_to_c (https://github.com/bitbank2/image_to_c) or an older Linux tool called xxd to convert a binary file into this type of text. Make sure to add a const/PROGMEM modifier in front of the JPEG data array to ensure that it gets written to FLASH and not RAM by your build environment.
 
 The Callback functions:
 -----------------------

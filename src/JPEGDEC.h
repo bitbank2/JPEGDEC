@@ -195,6 +195,9 @@ typedef struct jpeg_image_tag
 } JPEGIMAGE;
 
 #ifdef __cplusplus
+#if defined(__has_include) && __has_include(<FS.h>)
+#include "FS.h"
+#endif
 #define JPEG_STATIC static
 //
 // The JPEGDEC class wraps portable C code which does the actual work
