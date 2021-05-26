@@ -20,8 +20,8 @@
 #include <stdio.h>
 #else
 #include <Arduino.h>
-#if defined(__has_include) && __has_include(<FS.h>)
-#include "FS.h"
+#if !defined(HAL_ESP32_HAL_H_) && defined(__has_include) && __has_include(<FS.h>)
+#include <FS.h>
 #endif
 #endif
 #ifndef PROGMEM
