@@ -2218,7 +2218,7 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
                 for (j=0; j<4; j++)
                 {
                     pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 2) >> 2; // average 2x2 block
-                    usDest[i] = usGrayTo565[pix];
+                    usDest[j] = usGrayTo565[pix];
                     pSrc += 2;
                 }
             }
@@ -2227,7 +2227,7 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
                 for (j=0; j<4; j++)
                 {
                     pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 2) >> 2; // average 2x2 block
-                    usDest[i] = __builtin_bswap16(usGrayTo565[pix]);
+                    usDest[j] = __builtin_bswap16(usGrayTo565[pix]);
                     pSrc += 2;
                 }
             }
@@ -2534,7 +2534,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                 else
                     JPEGPixelBE(pOutput+iCol+4+iPitch*4, Y1, Cb, Cr);
             }
-            pY += 8;
+            pY += 16;
             pCb += 8;
             pCr += 8;
             pOutput += iPitch;
@@ -3454,6 +3454,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 jd.iWidth = iPitch; // width of each LCD block group
                 if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dither to 4/2/1 bits
                     JPEGDither(pJPEG, cx * mcuCX, mcuCY);
+                if (jd.y + mcuCY > (pJPEG->iHeight>>iScaleShift)) { // last row needs to be trimmed
+                   jd.iHeight = (pJPEG->iHeight>>iScaleShift) - jd.y;
+                }
                 bContinue = (*pJPEG->pfnDraw)(&jd);
                 jd.x += iPitch;
                 if ((cx - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
