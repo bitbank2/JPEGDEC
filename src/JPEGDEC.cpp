@@ -29,7 +29,7 @@ JPEG_STATIC void JPEGGetMoreData(JPEGIMAGE *pPage);
 JPEG_STATIC int DecodeJPEG(JPEGIMAGE *pImage);
 
 // Include the C code which does the actual work
-#include "jpeg.c"
+#include "jpeg.inl"
 
 void JPEGDEC::setPixelType(int iType)
 {
