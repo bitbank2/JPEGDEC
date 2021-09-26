@@ -8,9 +8,11 @@
 #include <string.h>
 #include <time.h>
 #include "../src/JPEGDEC.h"
+#include "../src/jpeg.inl"
 #include "../test_images/tulips.h"
 
 JPEGIMAGE jpg;
+uint8_t ucDitherBuffer[1024 * 16];
 
 long micros()
 {
@@ -43,6 +45,8 @@ int rc;
     if (rc)
     {
         lTime = micros();
+        jpg.pDitherBuffer = ucDitherBuffer;
+        jpg.ucPixelType = FOUR_BIT_DITHERED;
 	if (JPEG_decode(&jpg, 0, 0, 0)) { // full size
 	    lTime = micros() - lTime;
             printf("full sized decode in %d us\n", (int)lTime);

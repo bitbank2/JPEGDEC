@@ -3,11 +3,8 @@ LIBS = -lm -lpthread
 
 all: jpegdec
 
-jpegdec: jpeg.o main.o
-	$(CC) main.o jpeg.o $(LIBS) -o jpegdec
-
-jpeg.o: ../src/jpeg.c ../src/JPEGDEC.h makefile
-	$(CC) $(CFLAGS) ../src/jpeg.c
+jpegdec: main.o
+	$(CC) main.o $(LIBS) -o jpegdec
 
 main.o: main.c ../src/JPEGDEC.h makefile
 	$(CC) $(CFLAGS) main.c
