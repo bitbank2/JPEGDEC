@@ -190,6 +190,13 @@ int JPEGDEC::decode(int x, int y, int iOptions)
     _jpeg.iOptions = iOptions;
     return DecodeJPEG(&_jpeg);
 } /* decode() */
+//
+// set draw callback context variable
+//
+void JPEGDEC::setContext(void *p)
+{
+    _jpeg.pContext = p;
+}
 
 int JPEGDEC::decodeDither(uint8_t *pDither, int iOptions)
 {

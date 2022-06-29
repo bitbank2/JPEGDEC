@@ -110,6 +110,7 @@ typedef struct jpeg_draw_tag
     int iWidth, iHeight; // size of this MCU
     int iBpp; // bit depth of the pixels (8 or 16)
     uint16_t *pPixels; // 16-bit pixels
+    void *pContext;
 } JPEGDRAW;
 
 // Callback function prototypes
@@ -185,6 +186,7 @@ typedef struct jpeg_image_tag
     JPEGCOMPINFO JPCI[MAX_COMPS_IN_SCAN]; /* Max color components */
     JPEGFILE JPEGFile;
     BUFFERED_BITS bb;
+    void *pContext;
     uint8_t *pDitherBuffer; // provided externally to do Floyd-Steinberg dithering
     uint16_t usPixels[MAX_BUFFERED_PIXELS];
     int16_t sMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
@@ -218,6 +220,7 @@ class JPEGDEC
     int getWidth();
     int getHeight();
     int getBpp();
+    void setContext(void *p);
     int getSubSample();
     int hasThumb();
     int getThumbWidth();

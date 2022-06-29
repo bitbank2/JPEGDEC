@@ -3453,6 +3453,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             {
                 xoff = 0;
                 jd.iWidth = iPitch; // width of each LCD block group
+                jd.pContext = pJPEG->pContext;
                 if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dither to 4/2/1 bits
                     JPEGDither(pJPEG, cx * mcuCX, mcuCY);
                 if ((jd.y - pJPEG->iYOffset + mcuCY) > (pJPEG->iHeight>>iScaleShift)) { // last row needs to be trimmed
