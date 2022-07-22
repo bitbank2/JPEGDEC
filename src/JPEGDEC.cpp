@@ -191,11 +191,11 @@ int JPEGDEC::decode(int x, int y, int iOptions)
     return DecodeJPEG(&_jpeg);
 } /* decode() */
 //
-// set draw callback context variable
+// set draw callback user pointer variable
 //
-void JPEGDEC::setContext(void *p)
+void JPEGDEC::setUserPointer(void *p)
 {
-    _jpeg.pContext = p;
+    _jpeg.pUser = p;
 }
 
 int JPEGDEC::decodeDither(uint8_t *pDither, int iOptions)
