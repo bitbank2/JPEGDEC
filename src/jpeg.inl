@@ -33,9 +33,11 @@ static void JPEGGetMoreData(JPEGIMAGE *pPage);
 static int DecodeJPEG(JPEGIMAGE *pImage);
 static int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
 static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition);
+#if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO )
 static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
 static int32_t seekFile(JPEGFILE *pFile, int32_t iPosition);
 static void closeFile(void *handle);
+#endif
 static void JPEGDither(JPEGIMAGE *pJPEG, int iWidth, int iHeight);
 /* JPEG tables */
 // zigzag ordering of DCT coefficients
