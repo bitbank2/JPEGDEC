@@ -674,6 +674,7 @@ static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 //
 static int JPEGInit(JPEGIMAGE *pJPEG)
 {
+    pJPEG->usPixels = pJPEG->usPixelsBuf;
     return JPEGParseInfo(pJPEG, 0); // gather info for image
 } /* JPEGInit() */
 //
@@ -3284,7 +3285,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     iErr = 0;
     pJPEG->iResCount = pJPEG->iResInterval;
     // Calculate how many MCUs we can fit in the pixel buffer to maximize LCD drawing speed
-    iMCUCount = MAX_BUFFERED_PIXELS / (mcuCX * mcuCY);
+    iMCUCount = (MAX_BUFFERED_PIXELS / 2) / (mcuCX * mcuCY);
     if (pJPEG->ucPixelType == EIGHT_BIT_GRAYSCALE)
         iMCUCount *= 2; // each pixel is only 1 byte
     if (iMCUCount > cx)
@@ -3462,6 +3463,13 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                    jd.iHeight = (pJPEG->iHeight>>iScaleShift) - (jd.y - pJPEG->iYOffset);
                 }
                 bContinue = (*pJPEG->pfnDraw)(&jd);
+                if (pJPEG->ucPixelType <= EIGHT_BIT_GRAYSCALE)
+                {
+                    // Using the internal buffer, swap to other half to allow for async DMA
+                    if (pJPEG->usPixels == pJPEG->usPixelsBuf) pJPEG->usPixels = pJPEG->usPixelsBuf + MAX_BUFFERED_PIXELS / 2;
+                    else pJPEG->usPixels = pJPEG->usPixelsBuf;
+                    jd.pPixels = pJPEG->usPixels;
+                }
                 jd.x += iPitch;
                 if ((cx - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
                     iPitch = (cx - 1 - x) * mcuCX;
