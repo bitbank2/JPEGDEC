@@ -3455,8 +3455,6 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             {
                 xoff = 0;
                 jd.iWidth = jd.iWidthUsed = iPitch; // width of each LCD block group
-                Serial.printf("width, iPitch = %d, %d\n", pJPEG->iWidth, iPitch);
-
                 jd.pUser = pJPEG->pUser;
                 if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dither to 4/2/1 bits
                     JPEGDither(pJPEG, cx * mcuCX, mcuCY);
