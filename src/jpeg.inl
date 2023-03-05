@@ -3378,7 +3378,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     if(pJPEG->cropping)
     {
         // If crop parameters are not within the image size, throw an error
-        if(pJPEG->iCropX > pJPEG->iWidth || pJPEG->iCropY > pJPEG->iHeight || pJPEG->iCropX + pJPEG->iCropWidth > pJPEG->iWidth || pJPEG->iCropY + pJPEG->iCropHeight > pJPEG->iHeight)
+        if(pJPEG->iCropX < 0 || pJPEG->iCropY < 0 || pJPEG->iCropWidth < 1 || pJPEG->iCropHeight < 1 || pJPEG->iCropX + pJPEG->iCropWidth > pJPEG->iWidth || pJPEG->iCropY + pJPEG->iCropHeight > pJPEG->iHeight)
         {
             pJPEG->iError = JPEG_INVALID_CROP;
             return 0;
