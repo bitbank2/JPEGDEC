@@ -203,6 +203,25 @@ int JPEGDEC::decode(int x, int y, int iOptions)
 {
     _jpeg.iXOffset = x;
     _jpeg.iYOffset = y;
+    _jpeg.cropping = false;
+    _jpeg.iOptions = iOptions;
+    return DecodeJPEG(&_jpeg);
+} /* decode() */
+//
+// Decode the image with cropping
+// returns:
+// 1 = good result
+// 0 = error
+//
+int JPEGDEC::decode(int x, int y, int cropX, int cropY, int cropWidth, int cropHeight, int iOptions)
+{
+    _jpeg.iXOffset = x;
+    _jpeg.iYOffset = y;
+    _jpeg.cropping = true;
+    _jpeg.iCropX = cropX;
+    _jpeg.iCropY = cropY;
+    _jpeg.iCropWidth = cropWidth;
+    _jpeg.iCropHeight = cropHeight;
     _jpeg.iOptions = iOptions;
     return DecodeJPEG(&_jpeg);
 } /* decode() */

@@ -86,7 +86,8 @@ enum {
     JPEG_INVALID_PARAMETER,
     JPEG_DECODE_ERROR,
     JPEG_UNSUPPORTED_FEATURE,
-    JPEG_INVALID_FILE
+    JPEG_INVALID_FILE,
+    JPEG_INVALID_CROP
 };
 
 typedef struct buffered_bits
@@ -166,6 +167,11 @@ typedef struct jpeg_image_tag
     int iThumbWidth, iThumbHeight; // thumbnail size (if present)
     int iThumbData; // offset to image data
     int iXOffset, iYOffset; // placement on the display
+    bool cropping;
+    int iCropX; // left corner of crop
+    int iCropY; // upper corner of crop
+    int iCropWidth; // crop width
+    int iCropHeight; // crop height
     uint8_t ucBpp, ucSubSample, ucHuffTableUsed;
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
     uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
@@ -217,6 +223,7 @@ class JPEGDEC
 #endif
     void close();
     int decode(int x, int y, int iOptions);
+    int decode(int x, int y, int cropX, int cropY, int cropWidth, int cropHeight, int iOptions);
     int decodeDither(uint8_t *pDither, int iOptions);
     int getOrientation();
     int getWidth();

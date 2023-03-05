@@ -3172,6 +3172,59 @@ uint8_t pixelmask=0, shift=0;
     } // for y
 } /* JPEGDither() */
 
+static void JPEGSkipMCU(JPEGIMAGE *pJPEG, int count, int iCr, int iCb, int *iDCPred0, int *iDCPred1, int *iDCPred2)
+{
+    unsigned char cDCTable0 = pJPEG->JPCI[0].dc_tbl_no;
+    unsigned char cACTable0 = pJPEG->JPCI[0].ac_tbl_no;
+    unsigned char cDCTable1 = pJPEG->JPCI[1].dc_tbl_no;
+    unsigned char cACTable1 = pJPEG->JPCI[1].ac_tbl_no;
+    unsigned char cDCTable2 = pJPEG->JPCI[2].dc_tbl_no;
+    unsigned char cACTable2 = pJPEG->JPCI[2].ac_tbl_no;
+
+    int iLum0 = MCU0;
+    int iLum1 = MCU1;
+    int iLum2 = MCU2;
+    int iLum3 = MCU3;
+
+    for (int i = 0; i < count; i++)
+    {
+        int iErr = 0;
+
+        pJPEG->ucACTable = cACTable0;
+        pJPEG->ucDCTable = cDCTable0;
+
+        // do the first luminance component
+        iErr = JPEGDecodeMCU(pJPEG, iLum0, iDCPred0);
+
+        // do the second luminance component
+        if (pJPEG->ucSubSample > 0x11) // subsampling
+        {
+            iErr |= JPEGDecodeMCU(pJPEG, iLum1, iDCPred0);
+
+            if (pJPEG->ucSubSample == 0x22)
+            {
+                iErr |= JPEGDecodeMCU(pJPEG, iLum2, iDCPred0);
+                iErr |= JPEGDecodeMCU(pJPEG, iLum3, iDCPred0);
+
+            } // if 2:2 subsampling
+        } // if subsampling used
+        
+        if (pJPEG->ucSubSample && pJPEG->ucNumComponents == 3) // if color (not CMYK)
+        {
+            // first chroma
+            pJPEG->ucACTable = cACTable1;
+            pJPEG->ucDCTable = cDCTable1;
+
+            iErr |= JPEGDecodeMCU(pJPEG, iCr, iDCPred1);
+            
+            // second chroma
+            pJPEG->ucACTable = cACTable2;
+            pJPEG->ucDCTable = cDCTable2;
+
+            iErr |= JPEGDecodeMCU(pJPEG, iCb, iDCPred2);
+        } // if color components present
+    }
+}
 //
 // Decode the image
 // returns 0 for error, 1 for success
@@ -3315,12 +3368,42 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         jd.pPixels = pJPEG->usPixels;
     jd.iHeight = mcuCY;
     jd.y = pJPEG->iYOffset;
-    for (y = 0; y < cy && bContinue && iErr == 0; y++, jd.y += mcuCY)
+
+    int yStart = 0;
+    int yEnd = cy;
+    int xStart = 0;
+    int xEnd = cx;
+    
+    // Check if all crop parameters have been set
+    if(pJPEG->cropping)
+    {
+        // If crop parameters are not within the image size, throw an error
+        if(pJPEG->iCropX > pJPEG->iWidth || pJPEG->iCropY > pJPEG->iHeight || pJPEG->iCropX + pJPEG->iCropWidth > pJPEG->iWidth || pJPEG->iCropY + pJPEG->iCropHeight > pJPEG->iHeight)
+        {
+            pJPEG->iError = JPEG_INVALID_CROP;
+            return 0;
+        }
+
+        yStart = pJPEG->iCropY/mcuCY; // we are rounding down to the nearest mcu so the cropping origin may not be pixel perfect
+        yEnd = yStart + ((pJPEG->iCropHeight + mcuCY - 1) / mcuCY); // here we need to round up to ensure we fill the cropped height
+
+        xStart = pJPEG->iCropX/mcuCX; // we are rounding down to the nearest mcu so the cropping origin may not be pixel perfect
+        xEnd = xStart + ((pJPEG->iCropWidth + mcuCX - 1) / mcuCX); // here we need to round up to ensure we fill the cropped width
+    }
+
+    if(pJPEG->cropping)
+        JPEGSkipMCU(pJPEG, yStart*cx, iCr, iCb, &iDCPred0, &iDCPred1, &iDCPred2);
+
+    for (y = yStart; y < yEnd && bContinue && iErr == 0; y++, jd.y += mcuCY)
     {
         jd.x = pJPEG->iXOffset;
         xoff = 0; // start of new LCD output group
         iPitch = iMCUCount * mcuCX; // pixels per line of LCD buffer
-        for (x = 0; x < cx && bContinue && iErr == 0; x++)
+
+        if(pJPEG->cropping)
+            JPEGSkipMCU(pJPEG, xStart, iCr, iCb, &iDCPred0, &iDCPred1, &iDCPred2);
+
+        for (x = xStart; x < xEnd && bContinue && iErr == 0; x++)
         {
             pJPEG->ucACTable = cACTable0;
             pJPEG->ucDCTable = cDCTable0;
@@ -3451,23 +3534,23 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 } // switch on color option
             }
             xoff += mcuCX;
-            if (xoff == iPitch || x == cx-1) // time to draw
+            if (xoff == iPitch || x == xEnd-1) // time to draw
             {
                 xoff = 0;
                 jd.iWidth = jd.iWidthUsed = iPitch; // width of each LCD block group
                 jd.pUser = pJPEG->pUser;
                 if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dither to 4/2/1 bits
-                    JPEGDither(pJPEG, cx * mcuCX, mcuCY);
+                    JPEGDither(pJPEG, xEnd * mcuCX, mcuCY);
                 if ((x+1)*mcuCX > pJPEG->iWidth) { // right edge has clipped pixels
-                   jd.iWidthUsed = iPitch - (cx*mcuCX - pJPEG->iWidth);
+                   jd.iWidthUsed = iPitch - (xEnd*mcuCX - pJPEG->iWidth);
                 }
                 if ((jd.y - pJPEG->iYOffset + mcuCY) > (pJPEG->iHeight>>iScaleShift)) { // last row needs to be trimmed
                    jd.iHeight = (pJPEG->iHeight>>iScaleShift) - (jd.y - pJPEG->iYOffset);
                 }
                 bContinue = (*pJPEG->pfnDraw)(&jd);
                 jd.x += iPitch;
-                if ((cx - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
-                    iPitch = (cx - 1 - x) * mcuCX;
+                if ((xEnd - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
+                    iPitch = (xEnd - 1 - x) * mcuCX;
             }
             if (pJPEG->iResInterval)
             {
@@ -3485,6 +3568,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             if (pJPEG->iVLCOff >= FILE_HIGHWATER)
                 JPEGGetMoreData(pJPEG); // need more 'filtered' VLC data
         } // for x
+        if(pJPEG->cropping)
+            JPEGSkipMCU(pJPEG, cx - xEnd, iCr, iCb, &iDCPred0, &iDCPred1, &iDCPred2);
     } // for y
     if (iErr != 0)
         pJPEG->iError = JPEG_DECODE_ERROR;
