@@ -3223,6 +3223,12 @@ static void JPEGSkipMCU(JPEGIMAGE *pJPEG, int count, int iCr, int iCb, int *iDCP
 
             iErr |= JPEGDecodeMCU(pJPEG, iCb, iDCPred2);
         } // if color components present
+
+        // See if we need to feed it more data
+        if (pJPEG->iVLCOff >= FILE_HIGHWATER)
+        {
+            JPEGGetMoreData(pJPEG); // need more 'filtered' VLC data
+        }
     }
 }
 //
