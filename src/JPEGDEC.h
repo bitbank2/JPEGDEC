@@ -13,17 +13,17 @@
 //
 #ifndef __JPEGDEC__
 #define __JPEGDEC__
-#if defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined( ESP_PLATFORM )
+//#if defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined( ESP_PLATFORM )
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
-#else
-#include <Arduino.h>
-#if !defined(HAL_ESP32_HAL_H_) && defined(__has_include) && __has_include(<FS.h>)
-#include <FS.h>
-#endif
-#endif
+//#else
+//#include <Arduino.h>
+//#if !defined(HAL_ESP32_HAL_H_) && defined(__has_include) && __has_include(<FS.h>)
+//#include <FS.h>
+//#endif
+//#endif
 #ifndef PROGMEM
 #define memcpy_P memcpy
 #define PROGMEM
