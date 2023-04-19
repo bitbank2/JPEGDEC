@@ -1030,6 +1030,8 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
             pBits = &pHuffVals[(iTable+4) * HUFF_TABLEN];
             p = pBits;
             p += 16; // point to bit data
+            if (iTable * HUFF11SIZE >= sizeof(pJPEG->usHuffAC) / 2)
+                return 0;
             pShort = &pJPEG->usHuffAC[iTable*HUFF11SIZE];
             pLong = &pJPEG->usHuffAC[iTable*HUFF11SIZE + 1024];
             cc = 0; // start with a code of 0
@@ -1455,6 +1457,11 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
 //                        pPage->JPCI[i].h_samp_factor = ucSamp >> 4;
 //                        pPage->JPCI[i].v_samp_factor = ucSamp & 0xf;
                         pPage->JPCI[i].quant_tbl_no = s[iOffset++]; // quantization table number
+                        if (pPage->JPCI[i].quant_tbl_no > 3)
+                        {
+                            pPage->iError = JPEG_DECODE_ERROR;
+                            return 0; // error
+                        }
                         usLen -= 3;
                     }
                 }
@@ -1637,6 +1644,8 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
         }
     }
     pMCU[0] = (short)*iDCPredictor; // store in MCU[0]
+    if (pJPEG->ucACTable > 1)
+        return -1;
     // Now get the other 63 AC coefficients
     pFast = &pJPEG->usHuffAC[pJPEG->ucACTable * HUFF11SIZE];
     if (pJPEG->b11Bit) // 11-bit "slow" tables used
