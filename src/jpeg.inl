@@ -22,6 +22,11 @@
 //
 #include "JPEGDEC.h"
 
+#ifdef TEENSYDUINO
+#include "my_cm4_simd.h"
+#define HAS_SIMD
+#endif
+
 #if defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7)
 #define HAS_SIMD
 #endif
@@ -1987,6 +1992,24 @@ static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable, int iACF
             tmp4 = tmp10 + tmp5;
         }
         // final output stage - scale down and range limit
+#ifdef HAS_SIMD
+        {
+            uint32_t ul, ulOut;
+            const uint32_t ulAdj = 0x800080;
+            ulOut = __SSAT16((((tmp0+tmp7)>>5) & 0xffff) | (((tmp2+tmp5)>>5)<<16), 8);
+            ulOut = __SADD16(ulOut, ulAdj); // adjust
+            ul = __SSAT16((((tmp1+tmp6)>>5) & 0xffff) | (((tmp3-tmp4)>>5)<<16), 8);
+            ul = __SADD16(ul, ulAdj); // adjust
+            ulOut |= (ul << 8); // combine 4 outputs
+            *(uint32_t *)pOutput = ulOut; // store first 4
+            ulOut = __SSAT16((((tmp3+tmp4)>>5) & 0xffff) | (((tmp1-tmp6)>>5)<<16), 8);
+            ulOut = __SADD16(ulOut, ulAdj); // adjust
+            ul = __SSAT16((((tmp2-tmp5)>>5) & 0xffff) | (((tmp0-tmp7)>>5)<<16), 8);
+            ul = __SADD16(ul, ulAdj); // adjust
+            ulOut |= (ul << 8); // combine 4 outputs
+            *(uint32_t *)&pOutput[4] = ulOut; // store second 4
+        }
+#else
         pOutput[0] = ucRangeTable[(((tmp0 + tmp7)>>5) & 0x3ff)];
         pOutput[1] = ucRangeTable[(((tmp1 + tmp6)>>5) & 0x3ff)];
         pOutput[2] = ucRangeTable[(((tmp2 + tmp5)>>5) & 0x3ff)];
@@ -1995,6 +2018,7 @@ static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable, int iACF
         pOutput[5] = ucRangeTable[(((tmp2 - tmp5)>>5) & 0x3ff)];
         pOutput[6] = ucRangeTable[(((tmp1 - tmp6)>>5) & 0x3ff)];
         pOutput[7] = ucRangeTable[(((tmp0 - tmp7)>>5) & 0x3ff)];
+#endif
         pOutput += 8;
     } // for each row
 } /* JPEGIDCT() */
@@ -2285,7 +2309,7 @@ static void JPEGPixelLE(uint16_t *pDest, int iY, int iCb, int iCr)
     ulTmp = __SMLAD(7258, ulCbCr, iY) >> 15; // Blue
     ulTmp = __USAT16(ulTmp, 5); // range limit to 5 bits
     ulPixel |= ulTmp; // now we have G + B
-    ulTmp = __SMLAD(5742, ulCbCr >> 16, iY) >> 15; // Red
+    ulTmp = __SMLAD(5742, iCr, iY) >> 15; // Red
     ulTmp = __USAT16(ulTmp, 5); // range limit to 5 bits
     ulPixel |= (ulTmp << 11); // now we have R + G + B
     pDest[0] = (uint16_t)ulPixel;
@@ -2319,6 +2343,32 @@ static void JPEGPixelBE(uint16_t *pDest, int iY, int iCb, int iCr)
     pDest[0] = __builtin_bswap16(usPixel);
 } /* JPEGPixelBE() */
 
+static void JPEGPixelRGB(uint32_t *pDest, int iY, int iCb, int iCr)
+{
+    int iCBB, iCBG, iCRG, iCRR;
+    uint32_t u32Pixel;
+    int32_t i32;
+
+    iCBB = 7258  * (iCb-0x80);
+    iCBG = -1409 * (iCb-0x80);
+    iCRG = -2925 * (iCr-0x80);
+    iCRR = 5742  * (iCr-0x80);
+    u32Pixel = 0xff000000; // Alpha = 0xff
+    i32 = ((iCBB + iY) >> 12);
+    if (i32 < 0) i32 = 0;
+    else if (i32 > 255) i32 = 255;
+    u32Pixel |= (uint32_t)i32; // blue
+    i32 = ((iCBG + iCRG + iY) >> 12); // green pixel
+    if (i32 < 0) i32 = 0;
+    else if (i32 > 255) i32 = 255;
+    u32Pixel |= (uint32_t)(i32 << 8);
+    i32 = ((iCRR + iY) >> 12); // red pixel
+    if (i32 < 0) i32 = 0;
+    else if (i32 > 255) i32 = 255;
+    u32Pixel |= (uint32_t)(i32 << 16);
+    pDest[0] = u32Pixel;
+} /* JPEGPixelRGB() */
+
 static void JPEGPixel2LE(uint16_t *pDest, int iY1, int iY2, int iCb, int iCr)
 {
     uint32_t ulPixel1, ulPixel2;
@@ -2338,8 +2388,8 @@ static void JPEGPixel2LE(uint16_t *pDest, int iY1, int iY2, int iCb, int iCr)
     ulTmp2 = __SMLAD(7258, ulCbCr, iY2) >> 15; // Blue 2
     ulTmp = __USAT16(ulTmp | (ulTmp2 << 16), 5); // range limit both to 5 bits
     ulPixel1 |= ulTmp; // now we have G + B
-    ulTmp = __SMLAD(5742, ulCbCr >> 16, iY1) >> 15; // Red 1
-    ulTmp2 = __SMLAD(5742, ulCbCr >> 16, iY2) >> 15; // Red 2
+    ulTmp = __SMLAD(5742, iCr, iY1) >> 15; // Red 1
+    ulTmp2 = __SMLAD(5742, iCr, iY2) >> 15; // Red 2
     ulTmp = __USAT16(ulTmp | (ulTmp2 << 16), 5); // range limit both to 5 bits
     ulPixel1 |= (ulTmp << 11); // now we have R + G + B
     *(uint32_t *)&pDest[0] = ulPixel1;
@@ -2378,6 +2428,46 @@ static void JPEGPixel2BE(uint16_t *pDest, int32_t iY1, int32_t iY2, int32_t iCb,
     ulPixel2 |= usRangeTableR[((iCRR + iY2) >> 12) & 0x3ff]; // red pixel
     *(uint32_t *)&pDest[0] = __builtin_bswap16(ulPixel1) | ((uint32_t)__builtin_bswap16(ulPixel2)<<16);
 } /* JPEGPixel2BE() */
+
+static void JPEGPixel2RGB(uint32_t *pDest, int32_t iY1, int32_t iY2, int32_t iCb, int32_t iCr)
+{
+    int32_t iCBB, iCBG, iCRG, iCRR;
+    uint32_t u32Pixel1, u32Pixel2;
+    int32_t i32;
+
+    iCBB = 7258L  * (iCb-0x80);
+    iCBG = -1409L * (iCb-0x80);
+    iCRG = -2925L * (iCr-0x80);
+    iCRR = 5742L  * (iCr-0x80);
+    i32 = ((iCBB + iY1) >> 12); // blue pixel
+    if (i32 < 0) i32 = 0;
+    else if (i32 > 255) i32 = 255;
+    u32Pixel1 = u32Pixel2 = 0xff000000; // Alpha = 255
+    u32Pixel1 |= (uint32_t)i32; // blue
+    i32 = ((iCBG + iCRG + iY1) >> 12); // green pixel
+    if (i32 < 0) i32 = 0;
+    else if (i32 > 255) i32 = 255;
+    u32Pixel1 |= (uint32_t)(i32 << 8); // green
+    i32 = ((iCRR + iY1) >> 12); // red pixel
+    if (i32 < 0) i32 = 0;
+    else if (i32 > 255) i32 = 255;
+    u32Pixel1 |= (uint32_t)(i32 << 16); // red
+
+    i32 = ((iCBB + iY2) >> 12); // blue pixel
+    if (i32 < 0) i32 = 0;
+    else if (i32 > 255) i32 = 255;
+    u32Pixel2 |= (uint32_t)i32;
+    i32 = ((iCBG + iCRG + iY2) >> 12); // green pixel
+    if (i32 < 0) i32 = 0;
+    else if (i32 > 255) i32 = 255;
+    u32Pixel2 |= (uint32_t)(i32 << 8);
+    i32 = ((iCRR + iY2) >> 12); // red pixel
+    if (i32 < 0) i32 = 0;
+    else if (i32 > 255) i32 = 255;
+    u32Pixel2 |= (uint32_t)(i32 << 16);
+    pDest[0] = u32Pixel1;
+    pDest[1] = u32Pixel2;
+} /* JPEGPixel2RGB() */
 
 static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
 {
@@ -2471,6 +2561,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
         }
         return;
     }
+// full size
     for (iRow=0; iRow<8; iRow++) // up to 8 rows to do
     {
         if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
@@ -2483,7 +2574,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
                 JPEGPixelLE(pOutput+iCol, Y, iCb, iCr);
             } // for col
         }
-        else
+        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
         {
             for (iCol=0; iCol<8; iCol++) // up to 4x2 cols to do
             {
@@ -2491,6 +2582,14 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
                 iCb = *pCb++;
                 Y = (int)(*pY++) << 12;
                 JPEGPixelBE(pOutput+iCol, Y, iCb, iCr);
+            } // for col
+        } else { // RGB888
+            for (iCol=0; iCol<8; iCol++) // up to 4x2 cols to do
+            {
+                iCr = *pCr++;
+                iCb = *pCb++;
+                Y = (int)(*pY++) << 12;
+                JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y, iCb, iCr);
             } // for col
         }
         pOutput += iPitch;
@@ -2642,6 +2741,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
         }
         return;
     }
+// full size
     /* Convert YCC pixels into RGB pixels and store in output image */
     iYCount = 4;
     bUseOdd1 = bUseOdd2 = 1; // assume odd column can be used
@@ -2693,7 +2793,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelLE(pOutput+iPitch + (iCol<<1), Y3, Cb, Cr);
                 }
             }
-            else
+            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
             {
                 if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
                 {
@@ -2705,7 +2805,18 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelBE(pOutput + (iCol<<1), Y1, Cb, Cr);
                     JPEGPixelBE(pOutput+iPitch + (iCol<<1), Y3, Cb, Cr);
                 }
-            }
+            } else { // RGB8888
+                if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
+                {
+                    JPEGPixel2RGB((uint32_t *)&pOutput[iCol<<2], Y1, Y2, Cb, Cr);
+                    JPEGPixel2RGB((uint32_t *)&pOutput[2*(iPitch + (iCol<<1))], Y3, Y4, Cb, Cr);
+                }
+                else
+                {
+                    JPEGPixelRGB((uint32_t *)&pOutput[iCol<<2], Y1, Cb, Cr);
+                    JPEGPixelRGB((uint32_t *)&pOutput[(iPitch + (iCol<<1))*2], Y3, Cb, Cr);
+                }
+            } // RGB8888
             // for top right block
             if (iCol < iXCount2)
             {
@@ -2732,7 +2843,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelLE(pOutput+iPitch+ 8+(iCol<<1), Y3, Cb, Cr);
                     }
                 }
-                else
+                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
                 {
                     if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
                     {
@@ -2744,7 +2855,18 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelBE(pOutput+ 8+(iCol<<1), Y1, Cb, Cr);
                         JPEGPixelBE(pOutput+iPitch+ 8+(iCol<<1), Y3, Cb, Cr);
                     }
-                }
+                } else { // RGB8888
+                    if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
+                    {
+                        JPEGPixel2RGB((uint32_t *)&pOutput[16+(iCol<<2)], Y1, Y2, Cb, Cr);
+                        JPEGPixel2RGB((uint32_t *)&pOutput[2*(iPitch + 8+(iCol<<1))], Y3, Y4, Cb, Cr);
+                    }
+                    else
+                    {
+                        JPEGPixelRGB((uint32_t *)&pOutput[16+(iCol<<2)], Y1, Cb, Cr);
+                        JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch+ 8+(iCol<<1))], Y3, Cb, Cr);
+                    }
+                } // RGB8888
             }
             // for bottom left block
             Y1 = pY[iCol*2+DCTSIZE*4];
@@ -2770,7 +2892,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelLE(pOutput+iPitch*9+ (iCol<<1), Y3, Cb, Cr);
                 }
             }
-            else
+            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
             {
                 if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
                 {
@@ -2782,7 +2904,18 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelBE(pOutput+iPitch*8+ (iCol<<1), Y1, Cb, Cr);
                     JPEGPixelBE(pOutput+iPitch*9+ (iCol<<1), Y3, Cb, Cr);
                 }
-            }
+            } else { // RGB8888
+                if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
+                {
+                    JPEGPixel2RGB((uint32_t *)&pOutput[2*(iPitch*8+ (iCol<<1))], Y1, Y2, Cb, Cr);
+                    JPEGPixel2RGB((uint32_t *)&pOutput[2*(iPitch*9+ (iCol<<1))], Y3, Y4, Cb, Cr);
+                }
+                else
+                {
+                    JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch*8+(iCol<<1))], Y1, Cb, Cr);
+                    JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch*9+ (iCol<<1))], Y3, Cb, Cr);
+                }
+            } // RGB8888
             // for bottom right block
             if (iCol < iXCount2)
             {
@@ -2809,7 +2942,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelLE(pOutput+iPitch*9+ 8+(iCol<<1), Y3, Cb, Cr);
                     }
                 }
-                else
+                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
                 {
                     if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
                     {
@@ -2821,7 +2954,18 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelBE(pOutput+iPitch*8+ 8+(iCol<<1), Y1, Cb, Cr);
                         JPEGPixelBE(pOutput+iPitch*9+ 8+(iCol<<1), Y3, Cb, Cr);
                     }
-                }
+                } else { // RGB8888
+                    if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
+                    {
+                        JPEGPixel2RGB((uint32_t *)&pOutput[2*(iPitch*8+ 8+(iCol<<1))], Y1, Y2, Cb, Cr);
+                        JPEGPixel2RGB((uint32_t *)&pOutput[2*(iPitch*9+ 8+(iCol<<1))], Y3, Y4, Cb, Cr);
+                    }
+                    else
+                    {
+                        JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch*8+ 8+(iCol<<1))], Y1, Cb, Cr);
+                        JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch*9+ 8+(iCol<<1))], Y3, Cb, Cr);
+                    }
+                } // RGB8888
             }
         } // for each column
         pY += 16; // skip to next line of source pixels
@@ -2951,6 +3095,7 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
         }
         return;
     }
+// full size
     /* Convert YCC pixels into RGB pixels and store in output image */
     iYCount = 16;
     iXCount = 8;
@@ -2969,11 +3114,14 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
                 JPEGPixelLE(pOutput + iCol, Y1, Cb, Cr);
                 JPEGPixelLE(pOutput + iPitch + iCol, Y2, Cb, Cr);
             }
-            else
+            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
             {
                 JPEGPixelBE(pOutput + iCol, Y1, Cb, Cr);
                 JPEGPixelBE(pOutput + iPitch + iCol, Y2, Cb, Cr);
-            }
+            } else { // RGB8888
+                JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y1, Cb, Cr);
+                JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch + iCol)], Y2, Cb, Cr);
+            } // RGB8888
         }
         pY += 16; // skip to next 2 lines of source pixels
         if (iRow == 6) // next MCU block, skip ahead to correct spot
@@ -2983,6 +3131,7 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
         pOutput += iPitch*2; // next 2 lines of dest pixels
     }
 } /* JPEGPutMCU12() */
+
 static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
 {
     int iCr, iCb;
@@ -3080,6 +3229,7 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
             JPEGPixel2BE(pOutput + iPitch + 2, Y1, Y2, iCb, iCr);
         return;
     }
+// Full size
     /* Convert YCC pixels into RGB pixels and store in output image */
     for (iRow=0; iRow<8; iRow++) // up to 8 rows to do
     {
@@ -3091,8 +3241,10 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
             Y2 = (signed int)(*pY++) << 12;
             if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
                 JPEGPixel2LE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
-            else
+            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
                 JPEGPixel2BE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
+            else // RGB8888
+                JPEGPixel2RGB((uint32_t *)&pOutput[iCol*4], Y1, Y2, iCb, iCr);
             // right block
             iCr = pCr[3];
             iCb = pCb[3];
@@ -3100,8 +3252,10 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
             Y2 = (signed int)pY[127] << 12;
             if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
                 JPEGPixel2LE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
-            else
+            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
                 JPEGPixel2BE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
+            else // RGB8888
+                JPEGPixel2RGB((uint32_t *)&pOutput[16 + iCol*4], Y1, Y2, iCb, iCr);
         } // for col
         pCb += 4;
         pCr += 4;
