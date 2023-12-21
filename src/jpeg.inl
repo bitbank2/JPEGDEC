@@ -2604,7 +2604,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
     unsigned char *pY, *pCr, *pCb;
     int bUseOdd1, bUseOdd2; // special case where 24bpp odd sized image can clobber first column
     uint16_t *pOutput = &pJPEG->usPixels[x];
-
+    if (pJPEG->ucPixelType == RGB8888) {
+        pOutput += x; // 4 bytes per pixel, not 2
+    }
     pY  = (unsigned char *)&pJPEG->sMCUs[0*DCTSIZE];
     pCb = (unsigned char *)&pJPEG->sMCUs[4*DCTSIZE];
     pCr = (unsigned char *)&pJPEG->sMCUs[5*DCTSIZE];
@@ -2972,6 +2974,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
         pCb += 8;
         pCr += 8;
         pOutput += iPitch*2;
+        if (pJPEG->ucPixelType == RGB8888) {
+            pOutput += iPitch*2;
+        }
     }
 } /* JPEGPutMCU22() */
 
@@ -3448,6 +3453,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     pJPEG->iResCount = pJPEG->iResInterval;
     // Calculate how many MCUs we can fit in the pixel buffer to maximize LCD drawing speed
     iMCUCount = MAX_BUFFERED_PIXELS / (mcuCX * mcuCY);
+    if (pJPEG->ucPixelType == RGB8888) {
+        iMCUCount /= 2; // half as many will fit
+    }
     if (pJPEG->ucPixelType == EIGHT_BIT_GRAYSCALE)
         iMCUCount *= 2; // each pixel is only 1 byte
     if (iMCUCount > cx)
@@ -3459,6 +3467,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     jd.iBpp = 16;
     switch (pJPEG->ucPixelType)
     {
+        case RGB8888:
+            jd.iBpp = 32;
+            break;
         case EIGHT_BIT_GRAYSCALE:
             jd.iBpp = 8;
             break;
