@@ -9,7 +9,7 @@
 #include <time.h>
 #include "JPEGDEC.h"
 #include "jpeg.inl"
-#include "tulips.h"
+#include "../test_images/tulips.h"
 
 // Human readable error messages
 const char *szErrors[] = {"Success", "Invalid parameter", "Decode error", "Unsupported feature", "Invalid file"};
@@ -163,11 +163,23 @@ int JPEGDraw(JPEGDRAW *pDraw)
     return 1;
 } /* JPEGDraw() */
 
-int ConvertFileTest(char *argv[])
+int ConvertFileTest(char *argv[], int iFraction)
 {
     int i, rc;
+    int cx, cy;
+    int iOption;
     long lTime;
     
+    if (iFraction == 2) {
+       iOption = JPEG_SCALE_HALF;
+    } else if (iFraction == 4) {
+       iOption = JPEG_SCALE_QUARTER;
+    } else if (iFraction == 8) {
+       iOption = JPEG_SCALE_EIGHTH;
+    } else {
+       iOption = 0; // full size
+    }
+
     bUseOutput = 1;
     ucPixelType = RGB8888; // generate 32-bit pixels for a Windows BMP file
     rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
@@ -175,8 +187,10 @@ int ConvertFileTest(char *argv[])
         printf("Error opening file %s\n", argv[1]);
         return -1;
     }
-    iDestPitch = jpg.iWidth * 4;
-    i = iDestPitch * jpg.iHeight;
+    cx = jpg.iWidth / iFraction;
+    cy = jpg.iHeight / iFraction;
+    iDestPitch = cx * 4;
+    i = iDestPitch * cy;
     pFrame = (uint8_t *)malloc(i);
     if (pFrame == NULL) {
         printf("Error allocating %d bytes\n", i);
@@ -184,11 +198,11 @@ int ConvertFileTest(char *argv[])
     }
     jpg.ucPixelType = ucPixelType;
     lTime = micros();
-    printf("Converting %d x %d image\n", jpg.iWidth, jpg.iHeight);
-    if (JPEG_decode(&jpg, 0, 0, 0)) { // full size
+    printf("Converting %d x %d image, fraction = %d\n", cx, cy, iFraction);
+    if (JPEG_decode(&jpg, 0, 0, iOption)) {
         lTime = micros() - lTime;
-        printf("full sized decode in %d us\n", (int)lTime);
-        WriteBMP(argv[2], pFrame, NULL, jpg.iWidth, jpg.iHeight, 32);
+        printf("JPEG decoded in %d us\n", (int)lTime);
+        WriteBMP(argv[2], pFrame, NULL, cx, cy, 32);
     } else {
         printf("Decode failed, last error = %s\n", szErrors[JPEG_getLastError(&jpg)]);
         return -1;
@@ -284,7 +298,7 @@ int rc = -1;
     if (argc == 1 || argc == 2) {
         rc = PerfTest(argc, argv);
     } else if (argc == 3) {
-        rc = ConvertFileTest(argv);
+        rc = ConvertFileTest(argv, 1); // change the 1 to 2/4/8 for fractional decode
     } else {
         printf("Invalid number of parameters (re-read the above)\n");
         return rc;
