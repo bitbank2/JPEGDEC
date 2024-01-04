@@ -31,6 +31,11 @@
 #define HAS_SIMD
 #endif
 
+#if defined(__arm__) || defined(__arm64__) || defined(__aarch64__)
+#include <arm_neon.h>
+#define HAS_NEON
+#endif
+
 // forward references
 static int JPEGInit(JPEGIMAGE *pJPEG);
 static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb);
@@ -64,6 +69,18 @@ static const unsigned char cZigZag2[64] = {0,1,8,16,9,2,3,10,
     29,22,15,23,30,37,44,51,
     58,59,52,45,38,31,39,46,
     53,60,61,54,47,55,62,63};
+
+#ifdef HAS_NEON
+// 16-bit constants for NEON ycc->rgb conversion
+static const int16_t __attribute__((aligned(16))) sYCCRGBConstants[4] = {5742/2, -2925/2, -1409/2, 7258/2};
+// 16-bit constants for IDCT calculation
+static const int16_t __attribute__((aligned(16))) s0414[8] = {1697*2,1697*2,1697*2,1697*2,1697*2,1697*2,1697*2,1697*2}; // 1.414213562 - 1.0
+static const int16_t __attribute__((aligned(16))) s1414[8] = {5793*2,5793*2,5793*2,5793*2,5793*2,5793*2,5793*2,5793*2}; // 1.414213562
+static const int16_t __attribute__((aligned(16))) s1847[8] = {7568*2,7568*2,7568*2,7568*2,7568*2,7568*2,7568*2,7568*2}; // 1.8477
+static const int16_t __attribute__((aligned(16))) s2613[8] = {-10703,-10703,-10703,-10703,-10703,-10703,-10703,-10703}; // -2.6131259
+static const int16_t __attribute__((aligned(16))) sp2613[8] = {10703,10703,10703,10703,10703,10703,10703,10703}; // 2.6131259
+static const int16_t __attribute__((aligned(16))) s1082[8] = {4433*2,4433*2,4433*2,4433*2,4433*2,4433*2,4433*2,4433*2}; // 1.08239
+#endif // HAS_NEON
 
 // For AA&N IDCT method, multipliers are equal to quantization
 // coefficients scaled by scalefactor[row]*scalefactor[col], where
@@ -2809,6 +2826,228 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
         return;
     }
 // full size
+#ifdef HAS_NEON
+    if (pJPEG->ucPixelType == RGB8888) {
+       int8x8_t i88Cr, i88Cb;
+       uint8x16_t u816YL, u816YR;
+       int16x8_t i168Cr, i168Cb, i168Y, i168Temp;
+       int16x4_t i164Constants;
+       int16x8_t i168R, i168G, i168B;
+       uint8x8_t u88R, u88G, u88B, u88A;
+       int16x8x2_t i168Crx2, i168Cbx2;
+       uint8x8x4_t u884Hack;
+       i164Constants = vld1_s16(&sYCCRGBConstants[0]); // 4 different constants used for "lane" multiplications by scalar
+       u88A = vdup_n_u8(0xff); // Alpha set to FF
+
+        for (iRow=0; iRow<8; iRow++) { // do 8 rows
+          i88Cr = vld1_s8((const int8_t *)pCr); // load 1 row of Cr
+          i88Cb = vld1_s8((const int8_t *) pCb); // load 1 row of Cb
+          u816YL = vld1q_u8(pY); // load 2 rows of Y (left block)
+          u816YR = vld1q_u8(pY+128); // load 2 rows of Y (right block)
+          // top left block
+          i168Temp = vdupq_n_s16((int16_t)0x8000); // fix Cr/Cb values by subtracting 0x80
+          i168Cr = vshll_n_s8(i88Cr, 8); // widen 8 Cr values and shift left 8
+          i168Cb = vshll_n_s8(i88Cb, 8); // widen 8 Cb values and shift left 8
+          i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_low_u8(u816YL), 4)); // widen and x16 to put on par with Cr/Cb values
+          i168Cr = vsubq_s16(i168Cr, i168Temp); // fix Cr/Cb (-0x80)
+          i168Cb = vsubq_s16(i168Cb, i168Temp);
+          i168Crx2 = vzipq_s16(i168Cr, i168Cr); // double elements in horizonal direction
+          i168Cbx2 = vzipq_s16(i168Cb, i168Cb);
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[0], i164Constants, 0); // Cr x 1.402
+          i168R = vaddq_s16(i168Temp, i168Y); // now we have 8 R values
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[0], i164Constants, 1); // Cr x -0.71414
+          u88R = vqshrun_n_s16(i168R, 4); // narrow and saturate to 8-bit unsigned
+          i168G = vaddq_s16(i168Y, i168Temp);
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[0], i164Constants, 2); // Cb x -0.34414
+          i168G = vaddq_s16(i168G, i168Temp); // now we have 8 G values
+          u88G = vqrshrun_n_s16(i168G, 4); // shift right, narrow and saturate to 8-bit unsigned
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[0], i164Constants, 3); // Cb x -1.772
+          i168B = vaddq_s16(i168Y, i168Temp); // now we have 8 B values
+          i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_low_u8(u816YR), 4)); // widen and x16 to put on par with Cr/Cb values (right block)
+          u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
+          // ugly hack due to bug in GCC of vst4 intrinsics
+          u884Hack.val[0] = u88B;
+          u884Hack.val[1] = u88G;
+          u884Hack.val[2] = u88R;
+          u884Hack.val[3] = u88A;
+          vst4_u8((uint8_t *)pOutput, u884Hack);
+          // top right block
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 0); // Cr x 1.402
+          i168R = vaddq_s16(i168Temp, i168Y); // now we have 8 R values
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 1); // Cr x -0.71414
+          u88R = vqshrun_n_s16(i168R, 4); // narrow and saturate to 8-bit unsigned
+          i168G = vaddq_s16(i168Y, i168Temp);
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[1], i164Constants, 2); // Cb x -0.34414
+          i168G = vaddq_s16(i168G, i168Temp); // now we have 8 G values
+          u88G = vqrshrun_n_s16(i168G, 4); // shift right, narrow and saturate to 8-bit unsigned
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[1], i164Constants, 3); // Cb x -1.772
+          i168B = vaddq_s16(i168Y, i168Temp); // now we have 8 B values
+          i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_high_u8(u816YL), 4)); // widen and x16 to put on par with Cr/Cb values (right block)
+          u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
+          // ugly hack due to bug in GCC of vst4 intrinsics
+          u884Hack.val[0] = u88B;
+          u884Hack.val[1] = u88G;
+          u884Hack.val[2] = u88R;
+          u884Hack.val[3] = u88A;
+          vst4_u8((uint8_t *)(pOutput+16), u884Hack);
+          // bottom left block
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[0], i164Constants, 0); // Cr x 1.402
+          i168R = vaddq_s16(i168Temp, i168Y); // now we have 8 R values
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[0], i164Constants, 1); // Cr x -0.71414
+          u88R = vqshrun_n_s16(i168R, 4); // narrow and saturate to 8-bit unsigned
+          i168G = vaddq_s16(i168Y, i168Temp);
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[0], i164Constants, 2); // Cb x -0.34414
+          i168G = vaddq_s16(i168G, i168Temp); // now we have 8 G values
+          u88G = vqrshrun_n_s16(i168G, 4); // shift right, narrow and saturate to 8-bit unsigned
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[0], i164Constants, 3); // Cb x -1.772
+          i168B = vaddq_s16(i168Y, i168Temp); // now we have 8 B values
+          i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_high_u8(u816YR), 4)); // widen and x16 to put on par with Cr/Cb values (bottom right block)
+          u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
+          // ugly hack due to bug in GCC of vst4 intrinsics
+          u884Hack.val[0] = u88B;
+          u884Hack.val[1] = u88G;
+          u884Hack.val[2] = u88R;
+          u884Hack.val[3] = u88A;
+          vst4_u8((uint8_t *)(pOutput+iPitch*2), u884Hack);
+          // bottom right block
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 0); // Cr x 1.402
+          i168R = vaddq_s16(i168Temp, i168Y); // now we have 8 R values
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 1); // Cr x -0.71414
+          u88R = vqshrun_n_s16(i168R, 4); // narrow and saturate to 8-bit unsigned
+          i168G = vaddq_s16(i168Y, i168Temp);
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[1], i164Constants, 2); // Cb x -0.34414
+          i168G = vaddq_s16(i168G, i168Temp); // now we have 8 G values
+          u88G = vqrshrun_n_s16(i168G, 4); // shift right, narrow and saturate to 8-bit unsigned
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[1], i164Constants, 3); // Cb x -1.772
+          i168B = vaddq_s16(i168Y, i168Temp); // now we have 8 B values
+          u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
+          // ugly hack due to bug in GCC of vst4 intrinsics
+          u884Hack.val[0] = u88B;
+          u884Hack.val[1] = u88G;
+          u884Hack.val[2] = u88R;
+          u884Hack.val[3] = u88A;
+          vst4_u8((uint8_t *)(pOutput+iPitch*2+16), u884Hack);
+          pCr += 8;
+          pCb += 8;
+          if (iRow == 3) // bottom 4 rows Y values are in 2 other MCUs
+             pY += 16 + 192; // skip to other 2 Y blocks
+          else
+             pY += 16;
+          pOutput += 4*iPitch;
+          } // for each row
+      return; // 32bpp
+      } else { // 16bpp
+       int8x8_t i88Cr, i88Cb;
+       uint8x16_t u816YL, u816YR;
+       int16x8_t i168Cr, i168Cb, i168Y, i168Temp;
+       int16x4_t i164Constants;
+       int16x8x2_t i168Crx2, i168Cbx2;
+       int16x8_t i168R, i168G, i168B;
+       uint8x8_t u88R, u88G, u88B;
+       uint16x8_t u168Temp, u168Temp2;
+       i164Constants = vld1_s16(&sYCCRGBConstants[0]); // 4 different constants used for "lane" multiplications by scalar
+
+          for (iRow=0; iRow<8; iRow++) { // do 8 rows
+           i88Cr = vld1_s8((const int8_t *) pCr); // load 1 row of Cr
+           i88Cb = vld1_s8((const int8_t *) pCb); // load 1 row of Cb
+          u816YL = vld1q_u8(pY); // load 2 rows of Y (left block)
+          u816YR = vld1q_u8(pY+128); // load 2 rows of Y (right block)
+          // top left block
+          i168Temp = vdupq_n_s16((int16_t) 0x8000); // fix Cr/Cb values by subtracting 0x80
+          i168Cr = vshll_n_s8(i88Cr, 8); // widen 8 Cr values and shift left 8
+          i168Cb = vshll_n_s8(i88Cb, 8); // widen 8 Cb values and shift left 8
+          i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_low_u8(u816YL), 4)); // widen and x16 to put on par with Cr/Cb values
+          i168Cr = vsubq_s16(i168Cr, i168Temp); // fix Cr/Cb (-0x80)
+          i168Cb = vsubq_s16(i168Cb, i168Temp);
+          i168Crx2 = vzipq_s16(i168Cr, i168Cr); // double elements in horizonal direction
+          i168Cbx2 = vzipq_s16(i168Cb, i168Cb);
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[0], i164Constants, 0); // Cr x 1.402
+          i168R = vaddq_s16(i168Temp, i168Y); // now we have 8 R values
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[0], i164Constants, 1); // Cr x -0.71414
+          u88R = vqshrun_n_s16(i168R, 4); // narrow and saturate to 8-bit unsigned
+          i168G = vaddq_s16(i168Y, i168Temp);
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[0], i164Constants, 2); // Cb x -0.34414
+          i168G = vaddq_s16(i168G, i168Temp); // now we have 8 G values
+          u88G = vqrshrun_n_s16(i168G, 4); // shift right, narrow and saturate to 8-bit unsigned
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[0], i164Constants, 3); // Cb x -1.772
+          i168B = vaddq_s16(i168Y, i168Temp); // now we have 8 B values
+          i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_low_u8(u816YR), 4)); // widen and x16 to put on par with Cr/Cb values (right block)
+          u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
+          u168Temp = vshll_n_u8(u88R, 8); // place red in upper part of 16-bit words
+          u168Temp2 = vshll_n_u8(u88G, 8); // shift green elements to top of 16-bit words
+          u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
+          u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
+          u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
+          vst1q_u16((uint16_t *)pOutput, u168Temp); // top left block
+          // top right block
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 0); // Cr x 1.402
+          i168R = vaddq_s16(i168Temp, i168Y); // now we have 8 R values
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 1); // Cr x -0.71414
+          u88R = vqshrun_n_s16(i168R, 4); // narrow and saturate to 8-bit unsigned
+          i168G = vaddq_s16(i168Y, i168Temp);
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[1], i164Constants, 2); // Cb x -0.34414
+          i168G = vaddq_s16(i168G, i168Temp); // now we have 8 G values
+          u88G = vqrshrun_n_s16(i168G, 4); // shift right, narrow and saturate to 8-bit unsigned
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[1], i164Constants, 3); // Cb x -1.772
+          i168B = vaddq_s16(i168Y, i168Temp); // now we have 8 B values
+          i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_high_u8(u816YL), 4)); // widen and x16 to put on par with Cr/Cb values (right block)
+          u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
+          u168Temp = vshll_n_u8(u88R, 8); // place red in upper part of 16-bit words
+          u168Temp2 = vshll_n_u8(u88G, 8); // shift green elements to top of 16-bit words
+          u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
+          u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
+          u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
+          vst1q_u16((uint16_t *)(pOutput+16), u168Temp); // top right block
+          // bottom left block
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[0], i164Constants, 0); // Cr x 1.402
+          i168R = vaddq_s16(i168Temp, i168Y); // now we have 8 R values
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[0], i164Constants, 1); // Cr x -0.71414
+          u88R = vqshrun_n_s16(i168R, 4); // narrow and saturate to 8-bit unsigned
+          i168G = vaddq_s16(i168Y, i168Temp);
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[0], i164Constants, 2); // Cb x -0.34414
+          i168G = vaddq_s16(i168G, i168Temp); // now we have 8 G values
+          u88G = vqrshrun_n_s16(i168G, 4); // shift right, narrow and saturate to 8-bit unsigned
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[0], i164Constants, 3); // Cb x -1.772
+          i168B = vaddq_s16(i168Y, i168Temp); // now we have 8 B values
+          i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_high_u8(u816YR), 4)); // widen and x16 to put on par with Cr/Cb values (bottom right block)
+          u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
+          u168Temp = vshll_n_u8(u88R, 8); // place red in upper part of 16-bit words
+          u168Temp2 = vshll_n_u8(u88G, 8); // shift green elements to top of 16-bit words
+          u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
+          u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
+          u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
+          vst1q_u16((uint16_t *)(pOutput+iPitch), u168Temp); // bottom left block
+          // bottom right block
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 0); // Cr x 1.402
+          i168R = vaddq_s16(i168Temp, i168Y); // now we have 8 R values
+          i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 1); // Cr x -0.71414
+          u88R = vqshrun_n_s16(i168R, 4); // narrow and saturate to 8-bit unsigned
+          i168G = vaddq_s16(i168Y, i168Temp);
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[1], i164Constants, 2); // Cb x -0.34414
+          i168G = vaddq_s16(i168G, i168Temp); // now we have 8 G values
+          u88G = vqrshrun_n_s16(i168G, 4); // shift right, narrow and saturate to 8-bit unsigned
+          i168Temp = vqdmulhq_lane_s16(i168Cbx2.val[1], i164Constants, 3); // Cb x -1.772
+          i168B = vaddq_s16(i168Y, i168Temp); // now we have 8 B values
+          u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
+          u168Temp = vshll_n_u8(u88R, 8); // place red in upper part of 16-bit words
+          u168Temp2 = vshll_n_u8(u88G, 8); // shift green elements to top of 16-bit words
+          u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
+          u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
+          u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
+          vst1q_u16((uint16_t *)(pOutput+iPitch+16), u168Temp); // bottom right block
+          // advance to next pair of lines
+          pCr += 8;
+          pCb += 8;
+          if (iRow == 3) // bottom 4 rows Y values are in 2 other MCUs
+             pY += 16 + 192; // skip to other 2 Y blocks
+          else
+             pY += 16;
+          pOutput += iPitch*2;
+          } // for each row
+      return;
+      } // 16bpp
+#endif // HAS_NEON
+    
     /* Convert YCC pixels into RGB pixels and store in output image */
     iYCount = 4;
     bUseOdd1 = bUseOdd2 = 1; // assume odd column can be used
@@ -3063,7 +3302,7 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
     
     if (pJPEG->iOptions & JPEG_SCALE_HALF)
     {
-        for (iRow=0; iRow<4; iRow++)
+        for (iRow=0; iRow<8; iRow++)
         {
             for (iCol=0; iCol<4; iCol++)
             {
@@ -3076,21 +3315,14 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelBE(pOutput+iCol, Y1, Cb, Cr);
                 else
                     JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y1, Cb, Cr);
-                Y1 = (pY[DCTSIZE*2] + pY[DCTSIZE*2+1] + pY[DCTSIZE*2+8] + pY[DCTSIZE*2+9]) << 10;
-                Cb = (pCb[32] + pCb[33] + 1) >> 1;
-                Cr = (pCr[32] + pCr[33] + 1) >> 1;
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
-                    JPEGPixelLE(pOutput+iCol+iPitch, Y1, Cb, Cr);
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
-                    JPEGPixelBE(pOutput+iCol+iPitch, Y1, Cb, Cr);
-                else
-                    JPEGPixelRGB((uint32_t *)&pOutput[(iCol+iPitch)*2], Y1, Cb, Cr);
                 pCb += 2;
                 pCr += 2;
                 pY += 2;
             }
             pY += 8;
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*4 : iPitch*2;
+            if (iRow == 3) // skip to next Y MCU block
+               pY += 64;
+            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
         }
         return;
     }
@@ -3223,7 +3455,7 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
             pY += (128-64);
         pCb += 8;
         pCr += 8;
-        pOutput += iPitch*2; // next 2 lines of dest pixels
+        pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*4 : iPitch*2; // next 2 lines of dest pixels
     }
 } /* JPEGPutMCU12() */
 
@@ -3235,7 +3467,7 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
     int iRow;
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
-    
+
     if (pJPEG->ucPixelType == RGB8888) {
         pOutput += x; // 4 bytes per pixel, not 2
     }   
@@ -3372,7 +3604,7 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
         } // for col
         pCb += 4;
         pCr += 4;
-        pOutput += iPitch;
+        pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
     } // for row
 } /* JPEGPutMCU21() */
 
