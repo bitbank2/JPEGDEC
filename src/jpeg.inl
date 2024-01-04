@@ -2478,6 +2478,10 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
 
+    if (pJPEG->ucPixelType == RGB8888) {
+        pOutput += x; // 4 bytes per pixel, not 2
+    }   
+
     pY  = (unsigned char *)&pJPEG->sMCUs[0*DCTSIZE];
     pCb = (unsigned char *)&pJPEG->sMCUs[1*DCTSIZE];
     pCr = (unsigned char *)&pJPEG->sMCUs[2*DCTSIZE];
@@ -3049,6 +3053,10 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
     
+    if (pJPEG->ucPixelType == RGB8888) {
+        pOutput += x; // 4 bytes per pixel, not 2
+    }   
+
     pY  = (uint8_t *)&pJPEG->sMCUs[0*DCTSIZE];
     pCb = (uint8_t *)&pJPEG->sMCUs[2*DCTSIZE];
     pCr = (uint8_t *)&pJPEG->sMCUs[3*DCTSIZE];
@@ -3228,6 +3236,10 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
     
+    if (pJPEG->ucPixelType == RGB8888) {
+        pOutput += x; // 4 bytes per pixel, not 2
+    }   
+
     pY  = (uint8_t *)&pJPEG->sMCUs[0*DCTSIZE];
     pCb = (uint8_t *)&pJPEG->sMCUs[2*DCTSIZE];
     pCr = (uint8_t *)&pJPEG->sMCUs[3*DCTSIZE];
