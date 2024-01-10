@@ -31,7 +31,7 @@
 #define HAS_SIMD
 #endif
 
-#if defined(__arm__) || defined(__arm64__) || defined(__aarch64__)
+#if !defined(HAS_SIMD) && (defined(__arm__) || defined(__arm64__) || defined(__aarch64__))
 #include <arm_neon.h>
 #define HAS_NEON
 #endif

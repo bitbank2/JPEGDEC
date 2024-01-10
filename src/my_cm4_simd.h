@@ -6,7 +6,7 @@
 #define __CM4_SIMD__
 
 #define __SSAT16(ARG1, ARG2) \
-__extension__ \ 
+__extension__ \
 ({                          \
   int32_t __RES, __ARG1 = (ARG1); \
   __asm volatile ("ssat16 %0, %1, %2" : "=r" (__RES) :  "I" (ARG2), "r" (__ARG1) : "cc" ); \

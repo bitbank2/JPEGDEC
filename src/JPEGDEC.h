@@ -28,6 +28,12 @@
 #define memcpy_P memcpy
 #define PROGMEM
 #endif
+// Cortex-M4/M7 allow unaligned access to SRAM
+#if defined(HAL_ESP32_HAL_H_) || defined(TEENSYDUINO) || defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7)
+sdfk
+#define ALLOWS_UNALIGNED
+#endif
+
 //
 // JPEG Decoder
 // Written by Larry Bank
@@ -256,11 +262,18 @@ void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType); // defaults to little endia
 void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs);
 #endif // __cplusplus
 
+#ifdef ALLOWS_UNALIGNED
+#define INTELSHORT(p) (*(uint16_t *)p)
+#define INTELLONG(p) (*(uint32_t *)p)
+#define MOTOSHORT(p) __builtin_bswap16(*(uint16_t *)p)
+#define MOTOLONG(p) __builtin_bswap32(*(uint32_t *)p)
+#else
 // Due to unaligned memory causing an exception, we have to do these macros the slow way
 #define INTELSHORT(p) ((*p) + (*(p+1)<<8))
 #define INTELLONG(p) ((*p) + (*(p+1)<<8) + (*(p+2)<<16) + (*(p+3)<<24))
 #define MOTOSHORT(p) (((*(p))<<8) + (*(p+1)))
 #define MOTOLONG(p) (((*p)<<24) + ((*(p+1))<<16) + ((*(p+2))<<8) + (*(p+3)))
+#endif // ALLOWS_UNALIGNED
 
 // Must be a 32-bit target processor
 #define REGISTER_WIDTH 32
