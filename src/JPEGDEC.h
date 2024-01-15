@@ -30,10 +30,14 @@
 #endif
 // Cortex-M4/M7 allow unaligned access to SRAM
 #if defined(HAL_ESP32_HAL_H_) || defined(TEENSYDUINO) || defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7)
-sdfk
 #define ALLOWS_UNALIGNED
+#define HAS_SIMD
 #endif
 
+#ifdef __aarch64
+#define HAS_NEON
+#define ALLOWS_UNALIGNED
+#endif // __aarch64
 //
 // JPEG Decoder
 // Written by Larry Bank

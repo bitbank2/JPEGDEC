@@ -23,7 +23,7 @@ long lTime;
     lTime = micros();
     if (jpeg.decode(0,0,0)) { // full sized decode
       lTime = micros() - lTime;
-      Serial.printf("full sized decode in %d us\n", (int)lTime);
+   //   Serial.printf("full sized decode in %d us\n", (int)lTime);
     }
     jpeg.close();
   }
@@ -31,7 +31,7 @@ long lTime;
     lTime = micros();
     if (jpeg.decode(0,0,JPEG_SCALE_HALF)) { // 1/2 sized decode
       lTime = micros() - lTime;
-      Serial.printf("half sized decode in %d us\n", (int)lTime);
+    //  Serial.printf("half sized decode in %d us\n", (int)lTime);
     }
     jpeg.close();
   }
@@ -39,7 +39,7 @@ long lTime;
     lTime = micros();
     if (jpeg.decode(0,0,JPEG_SCALE_QUARTER)) { // 1/4 sized decode
       lTime = micros() - lTime;
-      Serial.printf("quarter sized decode in %d us\n", (int)lTime);
+    //  Serial.printf("quarter sized decode in %d us\n", (int)lTime);
     }
     jpeg.close();
   }
@@ -47,7 +47,7 @@ long lTime;
     lTime = micros();
     if (jpeg.decode(0,0,JPEG_SCALE_EIGHTH)) { // 1/8 sized decode
       lTime = micros() - lTime;
-      Serial.printf("eighth sized decode in %d us\n", (int)lTime);
+    //  Serial.printf("eighth sized decode in %d us\n", (int)lTime);
     }
     jpeg.close();
   }
