@@ -31,6 +31,18 @@
 #define HAS_SIMD
 #endif
 
+#ifdef ARDUINO_ARCH_ESP32
+#include "dsps_fft2r_platform.h"
+#if (dsps_fft2r_sc16_aes3_enabled == 1)
+#define ESP32S3_SIMD
+extern "C" {
+void s3_ycbcr_convert_444(uint8_t *pY, uint8_t *pCB, uint8_t *pCR, uint16_t *pOut, int16_t *pConsts);
+void s3_ycbcr_convert_420(uint8_t *pY, uint8_t *pCB, uint8_t *pCR, uint16_t *pOut, int16_t *pConsts);
+}
+int16_t i16_Consts[8] = {0x80, 113, 90, 22, 46, 1,32,2048};
+#endif // S3 SIMD
+#endif // ESP32
+
 #if !defined(HAS_SIMD) && (defined(__arm__) || defined(__arm64__) || defined(__aarch64__))
 #include <arm_neon.h>
 #define HAS_NEON
@@ -2502,7 +2514,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
     pY  = (unsigned char *)&pJPEG->sMCUs[0*DCTSIZE];
     pCb = (unsigned char *)&pJPEG->sMCUs[1*DCTSIZE];
     pCr = (unsigned char *)&pJPEG->sMCUs[2*DCTSIZE];
-    
+
     if (pJPEG->iOptions & JPEG_SCALE_HALF)
     {
         for (iRow=0; iRow<4; iRow++) // up to 8 rows to do
@@ -2604,6 +2616,16 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
         return;
     }
 // full size
+#ifdef ESP32S3_SIMD
+    if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN) {
+        for (iRow=0; iRow<8; iRow++) {
+            s3_ycbcr_convert_444(pY, pCb, pCr, pOutput, i16_Consts);
+            pCb += 8; pCr += 8; pY += 8; pOutput += iPitch;
+        }
+        return;
+    }
+#endif // ESP32S3_SIMD
+
     for (iRow=0; iRow<8; iRow++) // up to 8 rows to do
     {
         if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
@@ -2826,6 +2848,24 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
         return;
     }
 // full size
+#ifdef ESP32S3_SIMD
+    if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN) {
+        for (iRow=0; iRow<4; iRow++) { // top L+R, 4 pairs of lines x 16 pixels
+            // each call converts 16 pixels
+            s3_ycbcr_convert_420(pY, pCb, pCr, pOutput, i16_Consts);
+            s3_ycbcr_convert_420(pY+8, pCb, pCr, pOutput+iPitch, i16_Consts);
+            pCb += 8; pCr += 8; pY += 16; pOutput += iPitch*2;
+        }
+        pY += (256 - 64);
+        for (iRow=0; iRow<4; iRow++) { // bottom L+R
+            s3_ycbcr_convert_420(pY, pCb, pCr, pOutput, i16_Consts);
+            s3_ycbcr_convert_420(pY+8, pCb, pCr, pOutput+iPitch, i16_Consts);
+            pCb += 8; pCr += 8; pY += 16; pOutput += iPitch*2;
+        }
+        return;
+    }
+#endif // ESP32S3_SIMD
+
 #ifdef HAS_NEON
     if (pJPEG->ucPixelType == RGB8888) {
        int8x8_t i88Cr, i88Cb;

@@ -31,7 +31,6 @@
 // Cortex-M4/M7 allow unaligned access to SRAM
 #if defined(HAL_ESP32_HAL_H_) || defined(TEENSYDUINO) || defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7)
 #define ALLOWS_UNALIGNED
-#define HAS_SIMD
 #endif
 
 #ifdef __aarch64
@@ -200,6 +199,7 @@ typedef struct jpeg_image_tag
     BUFFERED_BITS bb;
     void *pUser;
     uint8_t *pDitherBuffer; // provided externally to do Floyd-Steinberg dithering
+    long double bogus; // force 16-byte alignment
     uint16_t usPixels[MAX_BUFFERED_PIXELS];
     int16_t sMCUs[DCTSIZE * MAX_MCU_COUNT]; // 4:2:0 needs 6 DCT blocks per MCU
     int16_t sQuantTable[DCTSIZE*4]; // quantization tables
