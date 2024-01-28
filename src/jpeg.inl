@@ -38,12 +38,13 @@
 extern "C" {
 void s3_ycbcr_convert_444(uint8_t *pY, uint8_t *pCB, uint8_t *pCR, uint16_t *pOut, int16_t *pConsts, uint8_t ucPixelType);
 void s3_ycbcr_convert_420(uint8_t *pY, uint8_t *pCB, uint8_t *pCR, uint16_t *pOut, int16_t *pConsts, uint8_t ucPixelType);
+void s3_dequant(int16_t *pMCU, int16_t *pQuant);
 }
 int16_t i16_Consts[8] = {0x80, 113, 90, 22, 46, 1,32,2048};
 #endif // S3 SIMD
 #endif // ESP32
 
-#if !defined(HAS_SIMD) && (defined(__arm__) || defined(__arm64__) || defined(__aarch64__))
+#if !defined(HAS_SIMD) && (defined(__arm64__) || defined(__aarch64__))
 #include <arm_neon.h>
 #define HAS_NEON
 #endif
