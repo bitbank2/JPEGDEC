@@ -1383,6 +1383,17 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
     uint16_t usMarker, usLen = 0;
     int iFilePos = 0;
     
+    // make sure usPixels is 16-byte aligned for S3 SIMD (and possibly others)
+    i = (int)pPage->usUnalignedPixels;
+    i &= 15;
+    if (i == 0) i = 16; // already 16-byte aligned
+    pPage->usPixels = &pPage->usUnalignedPixels[(16-i)>>1];
+    // do the same for the MCU buffers
+    i = (int)pPage->sUnalignedMCUs;
+    i &= 15;
+    if (i == 0) i = 16;
+    pPage->sMCUs = &pPage->sUnalignedMCUs[(16-i)>>1];
+
     if (bExtractThumb) // seek to the start of the thumbnail image
     {
         iFilePos = pPage->iThumbData;
