@@ -2720,10 +2720,10 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxB = _mm_srai_epi16(mmxB, 4);
          mmxB = _mm_packus_epi16 (mmxB, mmxB); // i16->u8 bit and saturate
          mmxTemp = _mm_cmpeq_epi16(mmxTemp, mmxTemp); // Alpha set to FFFF
-         mmxCr = _mm_unpacklo_epi8(mmxR, mmxG); // interleave 8 R's and 8 G's
-         mmxCb = _mm_unpacklo_epi8(mmxB, mmxTemp); // interlave 8 B's and 8 A's
-         mmxTemp = _mm_unpacklo_epi16(mmxCr, mmxCb); // interleave 4 RG's and 4 BA's
-         mmxCr = _mm_unpackhi_epi16(mmxCr, mmxCb); // interleave 4 RG's and 4 BA's
+         mmxCr = _mm_unpacklo_epi8(mmxB, mmxG); // interleave 8 B's and 8 G's
+         mmxCb = _mm_unpacklo_epi8(mmxR, mmxTemp); // interlave 8 R's and 8 A's
+         mmxTemp = _mm_unpacklo_epi16(mmxCr, mmxCb); // interleave 4 BG's and 4 RA's
+         mmxCr = _mm_unpackhi_epi16(mmxCr, mmxCb); // interleave 4 BG's and 4 RA's
          _mm_storeu_si128((__m128i *)pOutput, mmxTemp); // write 4 RGBA pixels
          _mm_storeu_si128((__m128i *)(pOutput+8), mmxCr); // write 4 RGBA pixels
          pOutput += iPitch;
@@ -3290,10 +3290,10 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxB = _mm_srai_epi16(mmxB, 4);
          mmxB = _mm_packus_epi16 (mmxB, mmxB); // i16->u8 bit and saturate
          mmxTemp = _mm_cmpeq_epi16(mmxTemp, mmxTemp); // Alpha set to FFFF
-         mmxY = _mm_unpacklo_epi8(mmxR, mmxG); // interleave 8 R's and 8 G's
-         mmxTemp2 = _mm_unpacklo_epi8(mmxB, mmxTemp); // interlave 8 B's and 8 A's
-         mmxTemp = _mm_unpacklo_epi16(mmxY, mmxTemp2); // interleave 4 RG's and 4 BA's
-         mmxTemp2 = _mm_unpackhi_epi16(mmxY, mmxTemp2); // interleave 4 RG's and 4 BA's
+         mmxY = _mm_unpacklo_epi8(mmxB, mmxG); // interleave 8 B's and 8 G's
+         mmxTemp2 = _mm_unpacklo_epi8(mmxR, mmxTemp); // interlave 8 R's and 8 A's
+         mmxTemp = _mm_unpacklo_epi16(mmxY, mmxTemp2); // interleave 4 BG's and 4 RA's
+         mmxTemp2 = _mm_unpackhi_epi16(mmxY, mmxTemp2); // interleave 4 BG's and 4 RA's
          // store first row of pair
          _mm_storeu_si128((__m128i *)pOutput, mmxTemp); // write 4 RGBA pixels
          _mm_storeu_si128((__m128i *)(pOutput+8), mmxTemp2); // write 4 RGBA pixels
@@ -3317,10 +3317,10 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxB = _mm_srai_epi16(mmxB, 4);
          mmxB = _mm_packus_epi16 (mmxB, mmxB); // i16->u8 bit and saturate
          mmxTemp = _mm_cmpeq_epi16(mmxTemp, mmxTemp); // Alpha set to FFFF
-         mmxY = _mm_unpacklo_epi8(mmxR, mmxG); // interleave 8 R's and 8 G's
-         mmxTemp2 = _mm_unpacklo_epi8(mmxB, mmxTemp); // interlave 8 B's and 8 A's
-         mmxTemp = _mm_unpacklo_epi16(mmxY, mmxTemp2); // interleave 4 RG's and 4 BA's
-         mmxTemp2 = _mm_unpackhi_epi16(mmxY, mmxTemp2); // interleave 4 RG's and 4 BA's
+         mmxY = _mm_unpacklo_epi8(mmxB, mmxG); // interleave 8 B's and 8 G's
+         mmxTemp2 = _mm_unpacklo_epi8(mmxR, mmxTemp); // interlave 8 R's and 8 A's
+         mmxTemp = _mm_unpacklo_epi16(mmxY, mmxTemp2); // interleave 4 BG's and 4 RA's
+         mmxTemp2 = _mm_unpackhi_epi16(mmxY, mmxTemp2); // interleave 4 BG's and 4 RA's
          // store second row of pair
          _mm_storeu_si128((__m128i *)(pOutput+iPitch), mmxTemp); // write 4 RGBA pixels
          _mm_storeu_si128((__m128i *)(pOutput+iPitch+8), mmxTemp2); // write 4 RGBA pixels
@@ -3344,10 +3344,10 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxB = _mm_srai_epi16(mmxB, 4);
          mmxB = _mm_packus_epi16 (mmxB, mmxB); // i16->u8 bit and saturate
          mmxTemp = _mm_cmpeq_epi16(mmxTemp, mmxTemp); // Alpha set to FFFF
-         mmxY = _mm_unpacklo_epi8(mmxR, mmxG); // interleave 8 R's and 8 G's
-         mmxTemp2 = _mm_unpacklo_epi8(mmxB, mmxTemp); // interlave 8 B's and 8 A's
-         mmxTemp = _mm_unpacklo_epi16(mmxY, mmxTemp2); // interleave 4 RG's and 4 BA's
-         mmxTemp2 = _mm_unpackhi_epi16(mmxY, mmxTemp2); // interleave 4 RG's and 4 BA's
+         mmxY = _mm_unpacklo_epi8(mmxB, mmxG); // interleave 8 B's and 8 G's
+         mmxTemp2 = _mm_unpacklo_epi8(mmxR, mmxTemp); // interlave 8 R's and 8 A's
+         mmxTemp = _mm_unpacklo_epi16(mmxY, mmxTemp2); // interleave 4 BG's and 4 RA's
+         mmxTemp2 = _mm_unpackhi_epi16(mmxY, mmxTemp2); // interleave 4 BG's and 4 RA's
          // store first row of right block
          _mm_storeu_si128((__m128i *)(pOutput+16), mmxTemp); // write 4 RGBA pixels
          _mm_storeu_si128((__m128i *)(pOutput+24), mmxTemp2); // write 4 RGBA pixels
@@ -3371,10 +3371,10 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxB = _mm_srai_epi16(mmxB, 4);
          mmxB = _mm_packus_epi16 (mmxB, mmxB); // i16->u8 bit and saturate
          mmxTemp = _mm_cmpeq_epi16(mmxTemp, mmxTemp); // Alpha set to FFFF
-         mmxY = _mm_unpacklo_epi8(mmxR, mmxG); // interleave 8 R's and 8 G's
-         mmxTemp2 = _mm_unpacklo_epi8(mmxB, mmxTemp); // interlave 8 B's and 8 A's
-         mmxTemp = _mm_unpacklo_epi16(mmxY, mmxTemp2); // interleave 4 RG's and 4 BA's
-         mmxTemp2 = _mm_unpackhi_epi16(mmxY, mmxTemp2); // interleave 4 RG's and 4 BA's
+         mmxY = _mm_unpacklo_epi8(mmxB, mmxG); // interleave 8 B's and 8 G's
+         mmxTemp2 = _mm_unpacklo_epi8(mmxR, mmxTemp); // interlave 8 R's and 8 A's
+         mmxTemp = _mm_unpacklo_epi16(mmxY, mmxTemp2); // interleave 4 BG's and 4 RA's
+         mmxTemp2 = _mm_unpackhi_epi16(mmxY, mmxTemp2); // interleave 4 BG's and 4 RA's
          // store second row of right block
          _mm_storeu_si128((__m128i *)(pOutput+iPitch+16), mmxTemp); // write 4 RGBA pixels
          _mm_storeu_si128((__m128i *)(pOutput+iPitch+24), mmxTemp2); // write 4 RGBA pixels
