@@ -29,7 +29,7 @@
 #define PROGMEM
 #endif
 // Cortex-M4/M7 allow unaligned access to SRAM
-#if defined(HAL_ESP32_HAL_H_) || defined(TEENSYDUINO) || defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7)
+#if defined(HAL_ESP32_HAL_H_) || defined(TEENSYDUINO) || defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7) || defined (__x86_64__)
 #define ALLOWS_UNALIGNED
 #endif
 

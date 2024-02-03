@@ -45,7 +45,7 @@ int ucPixelType = RGB565_BIG_ENDIAN; // default output used for SPI LCDs
 //
 // Minimal code to save frames as Windows BMP files
 //
-void WriteBMP(char *fname, uint8_t *pBitmap, uint8_t *pPalette, int cx, int cy, int bpp)
+void WriteBMP(char *fname, uint8_t *pBitmap, uint8_t *pPalette, int cx, int cy, int bpp, int iDestPitch)
 {
 FILE * oHandle;
 int i, bsize, lsize;
@@ -116,7 +116,7 @@ int iHeaderSize;
    /* Write the image data */
    for (i=cy-1; i>=0; i--)
     {
-        s = &pBitmap[i*bsize];
+        s = &pBitmap[i*iDestPitch];
         if (bpp == 24) { // swap R/B for Windows BMP byte order
             int j, iBpp = bpp/8;
             uint8_t *d = ucTemp;
@@ -169,7 +169,8 @@ int ConvertFileTest(char *argv[], int iFraction)
     }
     cx = jpg.iWidth / iFraction;
     cy = jpg.iHeight / iFraction;
-    iDestPitch = cx * 4;
+    cx = (cx + 7) & 0xfff8; // align on at least 16-byte boundary
+    iDestPitch = (cx * 4); // 32-bits per pixel
     i = iDestPitch * (cy+15);
     pFrame = (uint8_t *)malloc(i);
     if (pFrame == NULL) {
@@ -183,7 +184,7 @@ int ConvertFileTest(char *argv[], int iFraction)
     if (JPEG_decode(&jpg, 0, 0, iOption)) {
         lTime = micros() - lTime;
         printf("JPEG decoded in %d us\n", (int)lTime);
-        WriteBMP(argv[2], pFrame, NULL, cx, cy, 32);
+        WriteBMP(argv[2], pFrame, NULL, cx, cy, 32, iDestPitch);
     } else {
         printf("Decode failed, last error = %s\n", szErrors[JPEG_getLastError(&jpg)]);
         return -1;

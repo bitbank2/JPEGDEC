@@ -3044,6 +3044,8 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxCb = _mm_unpacklo_epi8(mmxR, mmxTemp); // interlave 8 R's and 8 A's
          mmxTemp = _mm_unpacklo_epi16(mmxCr, mmxCb); // interleave 4 BG's and 4 RA's
          mmxCr = _mm_unpackhi_epi16(mmxCr, mmxCb); // interleave 4 BG's and 4 RA's
+//         _mm_stream_si128((__m128i*)pOutput, mmxTemp);
+//	_mm_stream_si128((__m128i*)(pOutput+8), mmxCr); 
          _mm_storeu_si128((__m128i *)pOutput, mmxTemp); // write 4 RGBA pixels
          _mm_storeu_si128((__m128i *)(pOutput+8), mmxCr); // write 4 RGBA pixels
          pOutput += iPitch;
@@ -4656,7 +4658,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         jd.x = pJPEG->iXOffset;
         xoff = 0; // start of new LCD output group
         if (pJPEG->pFramebuffer) { // user-supplied buffer is full width
-            iPitch = pJPEG->iWidth;
+            iPitch = (pJPEG->iWidth + 7) & 0xfff8; // must be 16-byte aligned
             pJPEG->usPixels = (uint16_t *)pJPEG->pFramebuffer;
             pJPEG->usPixels += (y * mcuCY * iPitch);
             if (pJPEG->ucPixelType == RGB8888) { // iPitch is 1/2
