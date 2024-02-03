@@ -170,7 +170,7 @@ int ConvertFileTest(char *argv[], int iFraction)
     cx = jpg.iWidth / iFraction;
     cy = jpg.iHeight / iFraction;
     iDestPitch = cx * 4;
-    i = iDestPitch * cy;
+    i = iDestPitch * (cy+15);
     pFrame = (uint8_t *)malloc(i);
     if (pFrame == NULL) {
         printf("Error allocating %d bytes\n", i);
