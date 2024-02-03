@@ -1504,12 +1504,12 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
     
     pPage->pFramebuffer = NULL; // this must be set AFTER calling this function
     // make sure usPixels is 16-byte aligned for S3 SIMD (and possibly others)
-    i = (int)pPage->usUnalignedPixels;
+    i = (int)(int64_t)pPage->usUnalignedPixels;
     i &= 15;
     if (i == 0) i = 16; // already 16-byte aligned
     pPage->usPixels = &pPage->usUnalignedPixels[(16-i)>>1];
     // do the same for the MCU buffers
-    i = (int)pPage->sUnalignedMCUs;
+    i = (int)(int64_t)pPage->sUnalignedMCUs;
     i &= 15;
     if (i == 0) i = 16;
     pPage->sMCUs = &pPage->sUnalignedMCUs[(16-i)>>1];
@@ -1734,13 +1734,14 @@ static void JPEGFixQuantD(JPEGIMAGE *pJPEG)
 //
 static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
 {
-    uint32_t ulCode, ulTemp;
+    my_ulong ulCode, ulTemp;
     uint8_t *pZig;
     signed char cCoeff;
     unsigned short *pFast;
     unsigned char ucHuff, *pucFast;
     uint32_t usHuff; // this prevents an unnecessary & 65535 for shorts
-    uint32_t ulBitOff, ulBits; // local copies to allow compiler to use register vars
+    uint32_t ulBitOff;
+    my_ulong ulBits; // local copies to allow compiler to use register vars
     uint8_t *pBuf, *pEnd, *pEnd2;
     signed short *pMCU = &pJPEG->sMCUs[iMCU];
     uint8_t ucMaxACCol, ucMaxACRow;
@@ -1802,7 +1803,7 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 ulBits = MOTOLONG(pBuf);
             }
             ulCode = ulBits << ulBitOff;
-            ulTemp = ~(uint32_t)(((int32_t)ulCode)>>31); // slide sign bit across other 31 bits
+            ulTemp = ~(my_ulong)(((my_long)ulCode)>>(REGISTER_WIDTH-1)); // slide sign bit across other 63/31 bits
             ulCode >>= (REGISTER_WIDTH - ucHuff);
             ulCode -= ulTemp>>(REGISTER_WIDTH-ucHuff);
             ulBitOff += ucHuff; // add bit length
@@ -1851,7 +1852,7 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
             if (pZig < pEnd && usHuff) // && piHisto)
             {
                 ulCode = ulBits << ulBitOff;
-                ulTemp = ~(uint32_t) (((int32_t) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
+                ulTemp = ~(my_ulong) (((my_long) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
                 ucMaxACCol |= 1<<(*pZig & 7); // keep track of occupied columns
@@ -1898,7 +1899,7 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
             if (pZig < pEnd2 && usHuff)
             {
                 ulCode = ulBits << ulBitOff;
-                ulTemp = ~(uint32_t) (((int32_t) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
+                ulTemp = ~(my_ulong) (((my_long) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
                 ucMaxACCol |= 1<<(*pZig & 7); // keep track of occupied columns
@@ -4547,7 +4548,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     
     // reorder and fix the quantization table for decoding
     JPEGFixQuantD(pJPEG);
-    pJPEG->bb.ulBits = MOTOLONG(&pJPEG->ucFileBuf[0]); // preload first 4 bytes
+    pJPEG->bb.ulBits = MOTOLONG(&pJPEG->ucFileBuf[0]); // preload first 4/8 bytes
     pJPEG->bb.pBuf = pJPEG->ucFileBuf;
     pJPEG->bb.ulBitOff = 0;
     

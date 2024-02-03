@@ -33,7 +33,7 @@
 #define ALLOWS_UNALIGNED
 #endif
 
-#ifdef __aarch64
+#if defined (__aarch64__) || defined (__arm64__)
 #define HAS_NEON
 #define ALLOWS_UNALIGNED
 #endif // __aarch64
@@ -73,6 +73,16 @@
 #define MCU4 (DCTSIZE * 4)
 #define MCU5 (DCTSIZE * 5)
 
+#if defined(__arm64__) || defined(__aarch64__) || defined (__x86_64__)
+#define REGISTER_WIDTH 64
+typedef uint64_t my_ulong;
+typedef int64_t my_long;
+#else
+#define REGISTER_WIDTH 32
+typedef uint32_t my_ulong;
+typedef int32_t my_long;
+#endif
+
 // Pixel types (defaults to little endian RGB565)
 enum {
     RGB565_LITTLE_ENDIAN = 0,
@@ -102,7 +112,7 @@ enum {
 typedef struct buffered_bits
 {
 unsigned char *pBuf; // buffer pointer
-uint32_t ulBits; // buffered bits
+my_ulong ulBits; // buffered bits
 uint32_t ulBitOff; // current bit offset
 } BUFFERED_BITS;
 
@@ -275,7 +285,11 @@ void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs);
 #define INTELSHORT(p) (*(uint16_t *)p)
 #define INTELLONG(p) (*(uint32_t *)p)
 #define MOTOSHORT(p) __builtin_bswap16(*(uint16_t *)p)
+#if REGISTER_WIDTH == 64
+#define MOTOLONG(p) __builtin_bswap64(*(uint64_t *)p)
+#else
 #define MOTOLONG(p) __builtin_bswap32(*(uint32_t *)p)
+#endif
 #else
 // Due to unaligned memory causing an exception, we have to do these macros the slow way
 #define INTELSHORT(p) ((*p) + (*(p+1)<<8))
@@ -283,8 +297,5 @@ void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs);
 #define MOTOSHORT(p) (((*(p))<<8) + (*(p+1)))
 #define MOTOLONG(p) (((*p)<<24) + ((*(p+1))<<16) + ((*(p+2))<<8) + (*(p+3)))
 #endif // ALLOWS_UNALIGNED
-
-// Must be a 32-bit target processor
-#define REGISTER_WIDTH 32
 
 #endif // __JPEGDEC__
