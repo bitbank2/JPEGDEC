@@ -1841,12 +1841,6 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
             {
                 goto mcu_done;
             }
-            if (ulBitOff > (REGISTER_WIDTH - 17)) // need to get more data
-            {
-                pBuf += (ulBitOff >> 3);
-                ulBitOff &= 7;
-                ulBits = MOTOLONG(pBuf);
-            }
             pZig += (usHuff >> 4);  // get the skip amount (RRRR)
             usHuff &= 0xf; // get (SSSS) - extra length
             if (pZig < pEnd && usHuff) // && piHisto)
@@ -1856,24 +1850,28 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
                 ucMCUFlags |= *pZig; // keep track of occupied columns
-//                if (*pZig >= 0x20) // if more than 4 rows used in a col, mark it
-//                    ucMaxACRow |= 1<<(*pZig & 7); // keep track of the max AC term row
                 pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
             pZig++;
-        } // while
-    }
-    else // 10-bit "fast" tables used
-    {
-        while (pZig < pEnd)
-        {
-            if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
+            if (ulBitOff > (REGISTER_WIDTH - 17)) // need to get more data
             {
                 pBuf += (ulBitOff >> 3);
                 ulBitOff &= 7;
                 ulBits = MOTOLONG(pBuf);
             }
+        } // while
+    }
+    else // 10-bit "fast" tables used
+    {
+        if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
+        {
+            pBuf += (ulBitOff >> 3);
+            ulBitOff &= 7;
+            ulBits = MOTOLONG(pBuf);
+        }
+        while (pZig < pEnd)
+        {
             ulCode = (ulBits >> (REGISTER_WIDTH - 16 - ulBitOff)) & 0xffff; // get as lower 16 bits
             if (ulCode >= 0xfc00) // first 6 bits = 1, use long table
                 ulCode = (ulCode & 0x7ff); // (ulCode & 0x3ff) + 0x400;
@@ -1884,15 +1882,15 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 return -1;
             ulBitOff += (usHuff >> 8); // add length
             usHuff &= 0xff; // get code (RRRR/SSSS)
-            if (usHuff == 0) // no more AC components
-            {
-                goto mcu_done;
-            }
             if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
             {
                 pBuf += (ulBitOff >> 3);
                 ulBitOff &= 7;
                 ulBits = MOTOLONG(pBuf);
+            }
+            if (usHuff == 0) // no more AC components
+            {
+                goto mcu_done;
             }
             pZig += (usHuff >> 4);  // get the skip amount (RRRR)
             usHuff &= 0xf; // get (SSSS) - extra length
@@ -1903,13 +1901,17 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
                 ucMCUFlags |= *pZig; // keep track of occupied columns
- //               if (*pZig >= 0x20) // if more than 4 rows used in a col, mark it
- //                   ucMaxACRow |= 1<<(*pZig & 7); // keep track of the max AC term row
                 pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
             pZig++;
-        } // while
+            if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
+            {
+                pBuf += (ulBitOff >> 3);
+                ulBitOff &= 7;
+                ulBits = MOTOLONG(pBuf);
+            }
+      } // while
     } // 10-bit tables
 mcu_done:
     pJPEG->bb.pBuf = pBuf;
@@ -2408,6 +2410,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
             *(uint32_t *)&pOutput[4] = ulOut; // store second 4
         }
 #else
+        // I've tried various things to speed this up, but it always seems to take the same amount of time
         pOutput[0] = ucRangeTable[(((tmp0 + tmp7)>>5) & 0x3ff)];
         pOutput[1] = ucRangeTable[(((tmp1 + tmp6)>>5) & 0x3ff)];
         pOutput[2] = ucRangeTable[(((tmp2 + tmp5)>>5) & 0x3ff)];
