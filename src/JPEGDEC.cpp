@@ -31,6 +31,11 @@ JPEG_STATIC int DecodeJPEG(JPEGIMAGE *pImage);
 // Include the C code which does the actual work
 #include "jpeg.inl"
 
+void JPEGDEC:setFramebuffer(void *pFramebuffer)
+{
+    JPEG_setFramebuffer(&_jpeg, pFramebuffer);
+} /* setFramebuffer() */
+
 void JPEGDEC::setPixelType(int iType)
 {
     if (iType >= 0 && iType < INVALID_PIXEL_TYPE)

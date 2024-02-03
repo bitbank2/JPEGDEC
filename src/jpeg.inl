@@ -49,7 +49,7 @@ int16_t i16_Consts[8] = {0x80, 113, 90, 22, 46, 1,32,2048};
 #include <emmintrin.h>
 #include <tmmintrin.h>
 #include <smmintrin.h>
-#include <immintrin.h> // AVX2
+//#include <immintrin.h> // AVX2
 #endif
 
 #if !defined(HAS_SIMD) && !defined(NO_SIMD) && (defined(__arm64__) || defined(__aarch64__))
@@ -626,18 +626,27 @@ int JPEG_hasThumb(JPEGIMAGE *pJPEG)
 {
     return (int)pJPEG->ucHasThumb;
 } /* JPEG_hasThumb() */
+
 int JPEG_getThumbWidth(JPEGIMAGE *pJPEG)
 {
     return pJPEG->iThumbWidth;
 } /* JPEG_getThumbWidth() */
+
 int JPEG_getThumbHeight(JPEGIMAGE *pJPEG)
 {
     return pJPEG->iThumbHeight;
 } /* JPEG_getThumbHeight() */
+
 void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType)
 {
     pJPEG->ucPixelType = (uint8_t)iType;
 } /* JPEG_setPixelType() */
+
+void JPEG_setFramebuffer(JPEGIMAGE *pJPEG, void *pFramebuffer)
+{
+    pJPEG->pFramebuffer = pFramebuffer;
+} /* JPEG_setFramebuffer() */
+
 void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs)
 {
     if (iMaxMCUs < 1)
@@ -1422,6 +1431,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
     uint16_t usMarker, usLen = 0;
     int iFilePos = 0;
     
+    pPage->pFramebuffer = NULL; // this must be set AFTER calling this function
     // make sure usPixels is 16-byte aligned for S3 SIMD (and possibly others)
     i = (int)pPage->usUnalignedPixels;
     i &= 15;
@@ -1853,7 +1863,17 @@ static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable, int iACF
     unsigned char *pOutput;
     unsigned char ucMaxACRow, ucMaxACCol;
     int16_t *pMCUSrc = &pJPEG->sMCUs[iMCUOffset];
-    
+#ifdef HAS_SSE
+__m128i mmxRow0, mmxRow1, mmxRow2, mmxRow3, mmxRow4, mmxRow5, mmxRow6, mmxRow7;
+__m128i mmxTemp, mmxTemp0, mmxTemp1, mmxTemp2, mmxTemp3, mmxTemp4, mmxTemp5, mmxTemp6, mmxTemp7, mmxTemp10, mmxTemp11, mmxTemp12, mmxTemp13;
+__m128i mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
+#endif // HAS_SSE
+#ifdef HAS_NEON
+int16x8_t mmxRow0, mmxRow1, mmxRow2, mmxRow3, mmxRow4, mmxRow5, mmxRow6, mmxRow7;
+int16x8_t mmxTemp, mmxTemp0, mmxTemp1, mmxTemp2, mmxTemp3, mmxTemp4, mmxTemp5, mmxTemp6, mmxTemp7, mmxTemp10, mmxTemp11, mmxTemp12, mmxTemp13;
+int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
+#endif // HAS_NEON
+ 
     ucMaxACRow = (unsigned char)(iACFlags >> 8);
     ucMaxACCol = iACFlags & 0xff;
         
@@ -1883,6 +1903,233 @@ static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable, int iACF
         pOutput[3] = ucRangeTable[(((tmp2 - tmp3)>>5) & 0x3ff)];
         return;
     }
+#ifdef HAS_SSE // SSE2 version
+    // Columns first
+    // even part
+    if (ucMaxACRow == 0) // rows 4-7 are not populated, simpler calculations
+       {
+       // even part
+       mmxTemp10 = _mm_loadu_si128((__m128i *)&pMCUSrc[0]); // row 0
+       mmxTemp1 = _mm_loadu_si128((__m128i *)&pMCUSrc[16]); // row 2
+       mmxTemp = _mm_loadu_si128((__m128i *)&pQuant[0]);
+       mmxTemp2 = _mm_loadu_si128((__m128i *)&pQuant[16]);
+       mmxTemp10 = _mm_mullo_epi16(mmxTemp10, mmxTemp); // dequant row 0
+       mmxTemp1 = _mm_mullo_epi16(mmxTemp1, mmxTemp2); // dequant row 2
+       mmxTemp = _mm_loadu_si128((__m128i *)&s0414[0]); // 0.414
+       mmxTemp12 = _mm_mulhi_epi16(_mm_slli_epi16(mmxTemp1, 2), mmxTemp); // tmp12 = ((tmp1*106)>>8)
+       mmxTemp0 = _mm_add_epi16(mmxTemp10, mmxTemp1); // 0+2
+       mmxTemp3 = _mm_sub_epi16(mmxTemp10, mmxTemp1); // 0-2
+       mmxTemp1 = _mm_add_epi16(mmxTemp10, mmxTemp12); // 10+12
+       mmxTemp2 = _mm_sub_epi16(mmxTemp10, mmxTemp12); // 10-12
+       // odd part
+       mmxTemp4 = _mm_loadu_si128((__m128i *)&pMCUSrc[8]); // row 1
+       mmxTemp5 = _mm_loadu_si128((__m128i *)&pMCUSrc[24]); // row 3
+       mmxTemp = _mm_loadu_si128((__m128i *)&pQuant[8]);
+       mmxTemp11 = _mm_loadu_si128((__m128i *)&pQuant[24]);
+       mmxTemp4 = _mm_mullo_epi16(mmxTemp4, mmxTemp); // dequant row 1
+       mmxTemp5 = _mm_mullo_epi16(mmxTemp5, mmxTemp11); // dequant row 3
+       mmxTemp7 = _mm_add_epi16(mmxTemp4, mmxTemp5); // tmp7 = tmp4 + tmp5
+       mmxTemp = _mm_loadu_si128((__m128i *)&s1414[0]); // load 1.414213562 constant
+       mmxTemp11 = _mm_mulhi_epi16(_mm_slli_epi16(_mm_sub_epi16(mmxTemp4, mmxTemp5), 2), mmxTemp); // tmp11 = (((tmp4-tmp5)*362)>>8)
+       mmxTemp = _mm_loadu_si128((__m128i *)&s1847[0]); // 1.8477
+       mmxZ5 = _mm_mulhi_epi16(_mm_slli_epi16(_mm_sub_epi16(mmxTemp4, mmxTemp5), 2), mmxTemp); // z5 = (((tmp4-tmp5)*473)>>8)
+       mmxTemp = _mm_loadu_si128((__m128i*)&sp2613[0]); // positive 2.6131259
+       mmxTemp12 = _mm_mulhi_epi16(_mm_slli_epi16(mmxTemp5, 2), mmxTemp); // tmp12 = ((-tmp5 * -669)>>8) + z5
+       // can't make that constant without overflowing, so double it after
+       mmxTemp12 = _mm_add_epi16(mmxTemp12, mmxTemp12);
+       mmxTemp12 = _mm_add_epi16(mmxTemp12, mmxZ5);
+       mmxTemp6 = _mm_sub_epi16(mmxTemp12, mmxTemp7); // tmp6 = tmp12 - tmp7
+       mmxTemp5 = _mm_sub_epi16(mmxTemp11, mmxTemp6); // tmp5 = tmp11 - tmp6
+       mmxTemp = _mm_loadu_si128((__m128i *)&s1082[0]); // 1.08239
+       mmxTemp10 = _mm_sub_epi16(_mm_mulhi_epi16(_mm_slli_epi16(mmxTemp4, 2), mmxTemp), mmxZ5); // tmp10 = ((tmp4 * 277)>>8) - z5
+       mmxTemp4 = _mm_add_epi16(mmxTemp10, mmxTemp5); // tmp4 = tmp10 + tmp5
+       }
+    else // need to do full calculation
+       {
+       // even part
+       mmxTemp0 = _mm_loadu_si128((__m128i *)&pMCUSrc[0]); // get row 0
+       mmxTemp2 = _mm_loadu_si128((__m128i *)&pMCUSrc[32]); // get row 4
+       mmxTemp10 = _mm_loadu_si128((__m128i *)&pQuant[0]);
+       mmxTemp11 = _mm_loadu_si128((__m128i *)&pQuant[32]);
+       mmxTemp0 = _mm_mullo_epi16(mmxTemp0, mmxTemp10); // dequant row 0
+       mmxTemp2 = _mm_mullo_epi16(mmxTemp2, mmxTemp11); // dequant row 4
+       mmxTemp10 = _mm_add_epi16(mmxTemp0, mmxTemp2); // 0+4
+       mmxTemp11 = _mm_sub_epi16(mmxTemp0, mmxTemp2); // 0-4
+       mmxTemp1 = _mm_loadu_si128((__m128i *)&pMCUSrc[16]); // get row 2
+       mmxTemp3 = _mm_loadu_si128((__m128i *)&pMCUSrc[48]); // get row 6
+       mmxTemp = _mm_loadu_si128((__m128i *)&pQuant[16]);
+       mmxTemp12 = _mm_loadu_si128((__m128i *)&pQuant[48]);
+       mmxTemp1 = _mm_mullo_epi16(mmxTemp1, mmxTemp); // dequant row 2
+       mmxTemp3 = _mm_mullo_epi16(mmxTemp3, mmxTemp12); // dequant row 6
+       mmxTemp13 = _mm_add_epi16(mmxTemp1, mmxTemp3); // 1+3
+       mmxTemp = _mm_loadu_si128((__m128i *)&s1414[0]); // load 1.414213562 constant
+       mmxTemp12 = _mm_sub_epi16(_mm_mulhi_epi16(_mm_slli_epi16(_mm_sub_epi16(mmxTemp1,mmxTemp3),2), mmxTemp), mmxTemp13); // tmp12 = (((tmp1 - tmp3) * 1.414) - tmp13;
+       mmxTemp0 = _mm_add_epi16(mmxTemp10, mmxTemp13); // tmp0 = tmp10 + tmp13
+       mmxTemp3 = _mm_sub_epi16(mmxTemp10, mmxTemp13); // tmp3 = tmp10 - tmp13
+       mmxTemp1 = _mm_add_epi16(mmxTemp11, mmxTemp12); // tmp1 = tmp11 + tmp12
+       mmxTemp2 = _mm_sub_epi16(mmxTemp11, mmxTemp12); // tmp2 = tmp11 - tmp12
+       // odd part
+       mmxTemp5 = _mm_loadu_si128((__m128i *)&pMCUSrc[24]); // get row 3
+       mmxTemp6 = _mm_loadu_si128((__m128i *)&pMCUSrc[40]); // get row 5
+       mmxTemp10 = _mm_loadu_si128((__m128i *)&pQuant[24]);
+       mmxTemp11 = _mm_loadu_si128((__m128i *)&pQuant[40]);
+       mmxTemp5 = _mm_mullo_epi16(mmxTemp5, mmxTemp10); // dequant row 3
+       mmxTemp6 = _mm_mullo_epi16(mmxTemp6, mmxTemp11); // dequant row 5
+       mmxZ13 = _mm_add_epi16(mmxTemp6, mmxTemp5); // z13 = tmp6 + tmp5;
+       mmxZ10 = _mm_sub_epi16(mmxTemp6, mmxTemp5); // z10 = tmp6 - tmp5;
+       mmxTemp4 = _mm_loadu_si128((__m128i *)&pMCUSrc[8]); // get row 1
+       mmxTemp7 = _mm_loadu_si128((__m128i *)&pMCUSrc[56]); // get row 7
+       mmxTemp10 = _mm_loadu_si128((__m128i *)&pQuant[8]);
+       mmxTemp11 = _mm_loadu_si128((__m128i *)&pQuant[56]);
+       mmxTemp4 = _mm_mullo_epi16(mmxTemp4, mmxTemp10); // dequant row 1
+       mmxTemp7 = _mm_mullo_epi16(mmxTemp7, mmxTemp11); // dequant row 7
+       mmxZ11 = _mm_add_epi16(mmxTemp4, mmxTemp7); // z11 = tmp4 + tmp7;
+       mmxZ12 = _mm_sub_epi16(mmxTemp4, mmxTemp7); // z12 = tmp4 - tmp7;
+       mmxTemp7 = _mm_add_epi16(mmxZ11, mmxZ13); // tmp7 = z11 + z13;
+       mmxTemp11 = _mm_mulhi_epi16(_mm_slli_epi16(_mm_sub_epi16(mmxZ11, mmxZ13),2), mmxTemp); // tmp11 = ((z11 - z13) * 1.1414);
+       mmxTemp = _mm_loadu_si128((__m128i *)&s1847[0]); // 1.8477
+       mmxZ5 = _mm_mulhi_epi16(_mm_slli_epi16(_mm_add_epi16(mmxZ10, mmxZ12),2), mmxTemp); // z5 = ((z10+z12)*1.8477);
+       mmxTemp = _mm_loadu_si128((__m128i *)&s2613[0]); // -2.6131259
+       mmxTemp12 = _mm_mulhi_epi16(_mm_slli_epi16(mmxZ10,2), mmxTemp); // tmp12 = (z10 * -2.6131259) + z5;
+       // can't make that constant without overflowing, so double it after
+       mmxTemp12 = _mm_add_epi16(mmxTemp12, mmxTemp12);
+       mmxTemp12 = _mm_add_epi16(mmxTemp12, mmxZ5);
+       mmxTemp = _mm_loadu_si128((__m128i *)&s1082[0]); // 1.08239
+       mmxTemp6 = _mm_sub_epi16(mmxTemp12, mmxTemp7); // tmp6 = tmp12 - tmp7
+       mmxTemp5 = _mm_sub_epi16(mmxTemp11, mmxTemp6); // tmp5 = tmp11 - tmp6
+       mmxTemp10 = _mm_sub_epi16(_mm_mulhi_epi16(_mm_slli_epi16(mmxZ12,2), mmxTemp), mmxZ5); // tmp10 = (z12 * 1.08239) - z5;
+       mmxTemp4 = _mm_add_epi16(mmxTemp10, mmxTemp5); // tmp4 = tmp10 + tmp5;
+       }
+    mmxRow0 = _mm_add_epi16(mmxTemp0, mmxTemp7); // row 0
+    _mm_storeu_si128((__m128i *)&pMCUSrc[0], mmxRow0);
+    mmxRow1 = _mm_add_epi16(mmxTemp1, mmxTemp6); // row 1
+    _mm_storeu_si128((__m128i *)&pMCUSrc[8], mmxRow1);
+    mmxRow2 = _mm_add_epi16(mmxTemp2, mmxTemp5); // row 2
+    _mm_storeu_si128((__m128i *)&pMCUSrc[16], mmxRow2);
+    mmxRow3 = _mm_sub_epi16(mmxTemp3, mmxTemp4); // row 3
+    _mm_storeu_si128((__m128i *)&pMCUSrc[24], mmxRow3);
+    mmxRow4 = _mm_add_epi16(mmxTemp3, mmxTemp4); // row 4
+    _mm_storeu_si128((__m128i *)&pMCUSrc[32], mmxRow4);
+    mmxRow5 = _mm_sub_epi16(mmxTemp2, mmxTemp5); // row 5
+    _mm_storeu_si128((__m128i *)&pMCUSrc[40], mmxRow5);
+    mmxRow6 = _mm_sub_epi16(mmxTemp1, mmxTemp6); // row 6
+    _mm_storeu_si128((__m128i *)&pMCUSrc[48], mmxRow6);
+    mmxRow7 = _mm_sub_epi16(mmxTemp0, mmxTemp7); // row 7
+    _mm_storeu_si128((__m128i *)&pMCUSrc[56], mmxRow7);
+#endif // HAS_SSE
+#ifdef HAS_NEON
+        if (ucMaxACRow == 0) // rows 4-7 are not populated, simpler calculations
+           {
+           // even part
+           mmxTemp10 = vld1q_s16(&pMCUSrc[0]); // row 0
+           mmxTemp1 = vld1q_s16(&pMCUSrc[16]); // row 2
+           mmxTemp = vld1q_s16(&pQuant[0]);
+           mmxTemp2 = vld1q_s16(&pQuant[16]);
+           mmxTemp10 = vmulq_s16(mmxTemp10, mmxTemp); // dequant row 0
+           mmxTemp1 = vmulq_s16(mmxTemp1, mmxTemp2); // dequant row 2
+           mmxTemp = vld1q_s16(&s0414[0]); // 0.414
+           mmxTemp12 = vqdmulhq_s16(vshlq_n_s16(mmxTemp1, 2), mmxTemp); // tmp12 = ((tmp1*106)>>8)
+           mmxTemp0 = vaddq_s16(mmxTemp10, mmxTemp1); // 0+2
+           mmxTemp3 = vsubq_s16(mmxTemp10, mmxTemp1); // 0-2
+           mmxTemp1 = vaddq_s16(mmxTemp10, mmxTemp12); // 10+12
+           mmxTemp2 = vsubq_s16(mmxTemp10, mmxTemp12); // 10-12
+           // odd part
+           mmxTemp4 = vld1q_s16(&pMCUSrc[8]); // row 1
+           mmxTemp5 = vld1q_s16(&pMCUSrc[24]); // row 3
+           mmxTemp = vld1q_s16(&pQuant[8]);
+           mmxTemp11 = vld1q_s16(&pQuant[24]);
+           mmxTemp4 = vmulq_s16(mmxTemp4, mmxTemp); // dequant row 1
+           mmxTemp5 = vmulq_s16(mmxTemp5, mmxTemp11); // dequant row 3
+           mmxTemp7 = vaddq_s16(mmxTemp4, mmxTemp5); // tmp7 = tmp4 + tmp5
+           mmxTemp = vld1q_s16(&s1414[0]); // load 1.414213562 constant
+           mmxTemp11 = vqdmulhq_s16(vshlq_n_s16(vsubq_s16(mmxTemp4, mmxTemp5), 2), mmxTemp); // tmp11 = (((tmp4-tmp5)*362)>>8)
+           mmxTemp = vld1q_s16(&s1847[0]); // 1.8477
+           mmxZ5 = vqdmulhq_s16(vshlq_n_s16(vsubq_s16(mmxTemp4, mmxTemp5), 2), mmxTemp); // z5 = (((tmp4-tmp5)*473)>>8)
+           mmxTemp = vld1q_s16(&sp2613[0]); // positive 2.6131259
+           mmxTemp12 = vqdmulhq_s16(vshlq_n_s16(mmxTemp5, 2), mmxTemp); // tmp12 = ((-tmp5 * -669)>>8) + z5
+           // can't make that constant without overflowing, so double it after
+           mmxTemp12 = vaddq_s16(mmxTemp12, mmxTemp12);
+           mmxTemp12 = vaddq_s16(mmxTemp12, mmxZ5);
+           mmxTemp6 = vsubq_s16(mmxTemp12, mmxTemp7); // tmp6 = tmp12 - tmp7
+           mmxTemp5 = vsubq_s16(mmxTemp11, mmxTemp6); // tmp5 = tmp11 - tmp6
+           mmxTemp = vld1q_s16(&s1082[0]); // 1.08239
+           mmxTemp10 = vsubq_s16(vqdmulhq_s16(vshlq_n_s16(mmxTemp4, 2), mmxTemp), mmxZ5); // tmp10 = ((tmp4 * 277)>>8) - z5
+           mmxTemp4 = vaddq_s16(mmxTemp10, mmxTemp5); // tmp4 = tmp10 + tmp5
+           }
+        else // need to do full calculation
+           {
+           // even part
+           mmxTemp0 = vld1q_s16(&pMCUSrc[0]); // get row 0
+           mmxTemp2 = vld1q_s16(&pMCUSrc[32]); // get row 4
+           mmxTemp10 = vld1q_s16(&pQuant[0]);
+           mmxTemp11 = vld1q_s16(&pQuant[32]);
+           mmxTemp0 = vmulq_s16(mmxTemp0, mmxTemp10); // dequant row 0
+           mmxTemp2 = vmulq_s16(mmxTemp2, mmxTemp11); // dequant row 4
+           mmxTemp10 = vaddq_s16(mmxTemp0, mmxTemp2); // 0+4
+           mmxTemp11 = vsubq_s16(mmxTemp0, mmxTemp2); // 0-4
+           mmxTemp1 = vld1q_s16(&pMCUSrc[16]); // get row 2
+           mmxTemp3 = vld1q_s16(&pMCUSrc[48]); // get row 6
+           mmxTemp = vld1q_s16(&pQuant[16]);
+           mmxTemp12 = vld1q_s16(&pQuant[48]);
+           mmxTemp1 = vmulq_s16(mmxTemp1, mmxTemp); // dequant row 2
+           mmxTemp3 = vmulq_s16(mmxTemp3, mmxTemp12); // dequant row 6
+           mmxTemp13 = vaddq_s16(mmxTemp1, mmxTemp3); // 1+3
+           mmxTemp = vld1q_s16(&s1414[0]); // load 1.414213562 constant
+           mmxTemp12 = vsubq_s16(vqdmulhq_s16(vshlq_n_s16(vsubq_s16(mmxTemp1,mmxTemp3),2), mmxTemp), mmxTemp13); // tmp12 = (((tmp1 - tmp3) * 1.414) - tmp13;
+           mmxTemp0 = vaddq_s16(mmxTemp10, mmxTemp13); // tmp0 = tmp10 + tmp13
+           mmxTemp3 = vsubq_s16(mmxTemp10, mmxTemp13); // tmp3 = tmp10 - tmp13
+           mmxTemp1 = vaddq_s16(mmxTemp11, mmxTemp12); // tmp1 = tmp11 + tmp12
+           mmxTemp2 = vsubq_s16(mmxTemp11, mmxTemp12); // tmp2 = tmp11 - tmp12
+           // odd part
+           mmxTemp5 = vld1q_s16(&pMCUSrc[24]); // get row 3
+           mmxTemp6 = vld1q_s16(&pMCUSrc[40]); // get row 5
+           mmxTemp10 = vld1q_s16(&pQuant[24]);
+           mmxTemp11 = vld1q_s16(&pQuant[40]);
+           mmxTemp5 = vmulq_s16(mmxTemp5, mmxTemp10); // dequant row 3
+           mmxTemp6 = vmulq_s16(mmxTemp6, mmxTemp11); // dequant row 5
+           mmxZ13 = vaddq_s16(mmxTemp6, mmxTemp5); // z13 = tmp6 + tmp5;
+           mmxZ10 = vsubq_s16(mmxTemp6, mmxTemp5); // z10 = tmp6 - tmp5;
+           mmxTemp4 = vld1q_s16(&pMCUSrc[8]); // get row 1
+           mmxTemp7 = vld1q_s16(&pMCUSrc[56]); // get row 7
+           mmxTemp10 = vld1q_s16(&pQuant[8]);
+           mmxTemp11 = vld1q_s16(&pQuant[56]);
+           mmxTemp4 = vmulq_s16(mmxTemp4, mmxTemp10); // dequant row 1
+           mmxTemp7 = vmulq_s16(mmxTemp7, mmxTemp11); // dequant row 7
+           mmxZ11 = vaddq_s16(mmxTemp4, mmxTemp7); // z11 = tmp4 + tmp7;
+           mmxZ12 = vsubq_s16(mmxTemp4, mmxTemp7); // z12 = tmp4 - tmp7;
+           mmxTemp7 = vaddq_s16(mmxZ11, mmxZ13); // tmp7 = z11 + z13;
+           mmxTemp11 = vqdmulhq_s16(vshlq_n_s16(vsubq_s16(mmxZ11, mmxZ13),2), mmxTemp); // tmp11 = ((z11 - z13) * 1.1414);
+           mmxTemp = vld1q_s16(&s1847[0]); // 1.8477
+           mmxZ5 = vqdmulhq_s16(vshlq_n_s16(vaddq_s16(mmxZ10, mmxZ12),2), mmxTemp); // z5 = ((z10+z12)*1.8477);
+           mmxTemp = vld1q_s16(&s2613[0]); // -2.6131259
+           mmxTemp12 = vqdmulhq_s16(vshlq_n_s16(mmxZ10,2), mmxTemp); // tmp12 = (z10 * -2.6131259) + z5;
+           // can't make that constant without overflowing, so double it after
+           mmxTemp12 = vaddq_s16(mmxTemp12, mmxTemp12);
+           mmxTemp12 = vaddq_s16(mmxTemp12, mmxZ5);
+           mmxTemp = vld1q_s16(&s1082[0]); // 1.08239
+           mmxTemp6 = vsubq_s16(mmxTemp12, mmxTemp7); // tmp6 = tmp12 - tmp7
+           mmxTemp5 = vsubq_s16(mmxTemp11, mmxTemp6); // tmp5 = tmp11 - tmp6
+           mmxTemp10 = vsubq_s16(vqdmulhq_s16(vshlq_n_s16(mmxZ12,2), mmxTemp), mmxZ5); // tmp10 = (z12 * 1.08239) - z5;
+           mmxTemp4 = vaddq_s16(mmxTemp10, mmxTemp5); // tmp4 = tmp10 + tmp5;
+           }
+        mmxRow0 = vaddq_s16(mmxTemp0, mmxTemp7); // row 0
+        vst1q_s16(&pMCUSrc[0], mmxRow0);
+        mmxRow1 = vaddq_s16(mmxTemp1, mmxTemp6); // row 1
+        vst1q_s16(&pMCUSrc[8], mmxRow1);
+        mmxRow2 = vaddq_s16(mmxTemp2, mmxTemp5); // row 2
+        vst1q_s16(&pMCUSrc[16], mmxRow2);
+        mmxRow3 = vsubq_s16(mmxTemp3, mmxTemp4); // row 3
+        vst1q_s16(&pMCUSrc[24], mmxRow3);
+        mmxRow4 = vaddq_s16(mmxTemp3, mmxTemp4); // row 4
+        vst1q_s16(&pMCUSrc[32], mmxRow4);
+        mmxRow5 = vsubq_s16(mmxTemp2, mmxTemp5); // row 5
+        vst1q_s16(&pMCUSrc[40], mmxRow5);
+        mmxRow6 = vsubq_s16(mmxTemp1, mmxTemp6); // row 6
+        vst1q_s16(&pMCUSrc[48], mmxRow6);
+        mmxRow7 = vsubq_s16(mmxTemp0, mmxTemp7); // row 7
+        vst1q_s16(&pMCUSrc[56], mmxRow7);
+#endif // HAS_NEON
+#if !defined (HAS_SSE) && !defined(HAS_NEON)
     // do columns first
     ucColMask = ucMaxACCol | 1; // column 0 must always be calculated
     for (iCol = 0; iCol < 8 && ucColMask; iCol++)
@@ -2008,6 +2255,7 @@ static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable, int iACF
             } // full calculation needed
         } // if column has data in it
     } // for each column
+#endif // NO SIMD
     // now do rows
     pOutput = (unsigned char *)pMCUSrc; // store output pixels back into MCU
     for (iRow=0; iRow<64; iRow+=8) // all rows must be calculated
@@ -4335,7 +4583,16 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     {
         jd.x = pJPEG->iXOffset;
         xoff = 0; // start of new LCD output group
-        iPitch = iMCUCount * mcuCX; // pixels per line of LCD buffer
+        if (pJPEG->pFramebuffer) { // user-supplied buffer is full width
+            iPitch = pJPEG->iWidth;
+            pJPEG->usPixels = (uint16_t *)pJPEG->pFramebuffer;
+            pJPEG->usPixels += (y * mcuCY * iPitch);
+            if (pJPEG->ucPixelType == RGB8888) { // iPitch is 1/2
+                 pJPEG->usPixels += (y * mcuCY * iPitch);
+            }
+        } else { // use our internal buffer to do it a block at a time
+            iPitch = iMCUCount * mcuCX; // pixels per line of LCD buffer
+        }
         for (x = 0; x < cx && bContinue && iErr == 0; x++)
         {
             pJPEG->ucACTable = cACTable0;
@@ -4467,7 +4724,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 } // switch on color option
             }
             xoff += mcuCX;
-            if (xoff == iPitch || x == cx-1) // time to draw
+            if (pJPEG->pFramebuffer == NULL && (xoff == iPitch || x == cx-1)) // time to draw
             {
                 xoff = 0;
                 jd.iWidth = jd.iWidthUsed = iPitch; // width of each LCD block group

@@ -40,7 +40,6 @@ JPEGIMAGE jpg;
 uint8_t *pFrame;
 int iDestPitch;
 //uint8_t ucDitherBuffer[1024 * 16];
-int bUseOutput = 0;
 int ucPixelType = RGB565_BIG_ENDIAN; // default output used for SPI LCDs
 
 //
@@ -145,24 +144,6 @@ struct timespec res;
     return iTime;
 } /* micros() */
 
-int JPEGDraw(JPEGDRAW *pDraw)
-{
-    int y;
-    uint8_t *d, *s;
-    
-    if (bUseOutput) {
-        s = (uint8_t *)pDraw->pPixels;
-        d = &pFrame[(pDraw->x * 4) + (pDraw->y * iDestPitch)];
-        // we need to copy the pixels a line at a time since the pitch is different
-        for (y=0; y<pDraw->iHeight; y++) {
-            memcpy(d, s, pDraw->iWidthUsed * 4);
-            d += iDestPitch;
-            s += pDraw->iWidth * 4;
-        }
-    }
-    return 1;
-} /* JPEGDraw() */
-
 int ConvertFileTest(char *argv[], int iFraction)
 {
     int i, rc;
@@ -180,9 +161,8 @@ int ConvertFileTest(char *argv[], int iFraction)
        iOption = 0; // full size
     }
 
-    bUseOutput = 1;
     ucPixelType = RGB8888; // generate 32-bit pixels for a Windows BMP file
-    rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
+    rc = JPEG_openFile(&jpg, argv[1], NULL);
     if (!rc) {
         printf("Error opening file %s\n", argv[1]);
         return -1;
@@ -196,6 +176,7 @@ int ConvertFileTest(char *argv[], int iFraction)
         printf("Error allocating %d bytes\n", i);
         return -1;
     }
+    JPEG_setFramebuffer(&jpg, pFrame);
     jpg.ucPixelType = ucPixelType;
     lTime = micros();
     printf("Converting %d x %d image, fraction = %d\n", cx, cy, iFraction);
@@ -210,6 +191,12 @@ int ConvertFileTest(char *argv[], int iFraction)
     JPEG_close(&jpg);
     return 0;
 } /* ConvertFileTest() */
+
+int JPEGDraw(JPEGDRAW *pDraw)
+{
+    (void)pDraw;
+    return 1;
+}
 
 int PerfTest(int argc, char *argv[])
 {
