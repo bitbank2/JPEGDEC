@@ -1357,7 +1357,17 @@ static int JPEGGetSOS(JPEGIMAGE *pJPEG, int *iOff)
 //
 static int JPEGFilter(uint8_t *pBuf, uint8_t *d, int iLen, uint8_t *bFF)
 {
-    // since we have the entire jpeg buffer in memory already, we can just change it in place
+#ifdef HAS_SSE
+	__m128i xmmIn, xmmOut;
+        __m128i xmmFF = _mm_cmpeq_epi8(xmmIn, xmmIn);
+#endif // HAS_SSE
+#ifdef HAS_NEON
+	uint8x16_t u816FF = vdupq_n_u8(0xff);
+	uint8x16_t u816In, u816Out;
+	uint8x8_t u88Merged;
+	uint32x2_t u322merged;
+#endif // HAS_NEON
+
     unsigned char c, *s, *pEnd, *pStart;
     
     pStart = d;
@@ -1370,6 +1380,67 @@ static int JPEGFilter(uint8_t *pBuf, uint8_t *d, int iLen, uint8_t *bFF)
         s++;
         *bFF = 0;
     }
+#ifdef HAS_SSE
+	while (s < pEnd-16)
+	{
+		xmmIn = _mm_loadu_si128((__m128i*)s);
+		xmmOut = _mm_cmpeq_epi8(xmmFF, xmmIn); // any FF's in these 16 bytes?
+		if (_mm_movemask_epi8(xmmOut) == 0) // no FF's, just copy this block
+		{
+			_mm_storeu_si128((__m128i*)d, xmmIn);
+			s += 16;
+			d += 16;
+		}
+		else
+		{
+                        int i = 16; // do these 16 bytes the slow way
+                        while (i) {
+                                c = *d++ = *s++;
+                                if (c == 0xff) { // marker or stuffed zeros?
+                                        if (s[0] != 0) { // it's a marker, skip both
+                                                d--;
+                                        }
+                                s++; // for stuffed 0's, store the FF, skip the 00
+                                } // found FF
+                                i--;
+                        } // while processing the 16 "slow" bytes
+		}
+	} // while SSE filtering
+#endif // HAS_SSE
+#ifdef HAS_NEON
+		while (s < pEnd - 16)
+		{
+			u816In = vld1q_u8(s);
+			u816Out = vceqq_u8(u816FF, u816In); // any FF's in these 16 bytes?
+#ifdef OLD_NEON
+			u88Merged = vpadd_u8(vget_high_u8(u816Out), vget_low_u8(u816Out));
+			u322merged = vpadd_u32 (vreinterpret_u32_u8(u88Merged), vreinterpret_u32_u8(u88Merged));
+			if (vget_lane_u32 (u322merged, 0)  == 0) // no FF's, just copy this block
+#else
+                        if (vaddvq_u8(u816Out) == 0) // any byte != 0 means FFs
+#endif
+			{
+				vst1q_u8(d, u816In);
+				s += 16;
+				d += 16;
+			}
+			else
+			{
+			int i = 16; // do these 16 bytes the slow way
+			while (i) {
+				c = *d++ = *s++;
+				if (c == 0xff) { // marker or stuffed zeros?
+					if (s[0] != 0) { // it's a marker, skip both
+						d--;
+					}
+				s++; // for stuffed 0's, store the FF, skip the 00
+				} // found FF
+				i--;
+			} // while processing the 16 "slow" bytes
+			} // if need to remove stuffed FF's or markers
+		} // while processing buffer with SIMD
+#endif // HAS_NEON
+
     while (s < pEnd)
     {
         c = *d++ = *s++;
