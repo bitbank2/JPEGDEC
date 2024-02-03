@@ -31,7 +31,7 @@ JPEG_STATIC int DecodeJPEG(JPEGIMAGE *pImage);
 // Include the C code which does the actual work
 #include "jpeg.inl"
 
-void JPEGDEC:setFramebuffer(void *pFramebuffer)
+void JPEGDEC::setFramebuffer(void *pFramebuffer)
 {
     JPEG_setFramebuffer(&_jpeg, pFramebuffer);
 } /* setFramebuffer() */
