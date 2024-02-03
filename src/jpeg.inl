@@ -1744,7 +1744,7 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
     my_ulong ulBits; // local copies to allow compiler to use register vars
     uint8_t *pBuf, *pEnd, *pEnd2;
     signed short *pMCU = &pJPEG->sMCUs[iMCU];
-    uint8_t ucMaxACCol, ucMaxACRow;
+    uint8_t ucMCUFlags;
     
     #define MIN_DCT_THRESHOLD 8
         
@@ -1771,7 +1771,7 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
         memset(pMCU, 0, 64*sizeof(short)); // pre-fill with zero since we may skip coefficients
         pEnd2 = (uint8_t *)&cZigZag2[64];
     }
-    ucMaxACCol = ucMaxACRow = 0;
+    ucMCUFlags = 0;
     pZig = (unsigned char *)&cZigZag2[1];
     pEnd = (unsigned char *)&cZigZag2[64];
 
@@ -1855,9 +1855,9 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 ulTemp = ~(my_ulong) (((my_long) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
-                ucMaxACCol |= 1<<(*pZig & 7); // keep track of occupied columns
-                if (*pZig >= 0x20) // if more than 4 rows used in a col, mark it
-                    ucMaxACRow |= 1<<(*pZig & 7); // keep track of the max AC term row
+                ucMCUFlags |= *pZig; // keep track of occupied columns
+//                if (*pZig >= 0x20) // if more than 4 rows used in a col, mark it
+//                    ucMaxACRow |= 1<<(*pZig & 7); // keep track of the max AC term row
                 pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
@@ -1902,9 +1902,9 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 ulTemp = ~(my_ulong) (((my_long) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
-                ucMaxACCol |= 1<<(*pZig & 7); // keep track of occupied columns
-                if (*pZig >= 0x20) // if more than 4 rows used in a col, mark it
-                    ucMaxACRow |= 1<<(*pZig & 7); // keep track of the max AC term row
+                ucMCUFlags |= *pZig; // keep track of occupied columns
+ //               if (*pZig >= 0x20) // if more than 4 rows used in a col, mark it
+ //                   ucMaxACRow |= 1<<(*pZig & 7); // keep track of the max AC term row
                 pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
@@ -1916,14 +1916,13 @@ mcu_done:
     pJPEG->iVLCOff = (int)(pBuf - pJPEG->ucFileBuf);
     pJPEG->bb.ulBitOff = ulBitOff;
     pJPEG->bb.ulBits = ulBits;
-    pJPEG->ucMaxACCol = ucMaxACCol;
-    pJPEG->ucMaxACRow = ucMaxACRow; // DEBUG
+    pJPEG->ucMCUFlags = ucMCUFlags;
     return 0;
 } /* JPEGDecodeMCU() */
 //
 // Inverse DCT
 //
-static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable, int iACFlags)
+static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable)
 {
     int iRow;
     unsigned char ucColMask;
@@ -1933,7 +1932,7 @@ static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable, int iACF
     signed int tmp0,tmp1,tmp2,tmp3,tmp4,tmp5;
     signed short *pQuant;
     unsigned char *pOutput;
-    unsigned char ucMaxACRow, ucMaxACCol;
+    unsigned char ucMCUFlags;
     int16_t *pMCUSrc = &pJPEG->sMCUs[iMCUOffset];
 #ifdef HAS_SSE
 __m128i mmxRow0, mmxRow1, mmxRow2, mmxRow3, mmxRow4, mmxRow5, mmxRow6, mmxRow7;
@@ -1946,8 +1945,7 @@ int16x8_t mmxTemp, mmxTemp0, mmxTemp1, mmxTemp2, mmxTemp3, mmxTemp4, mmxTemp5, m
 int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
 #endif // HAS_NEON
  
-    ucMaxACRow = (unsigned char)(iACFlags >> 8);
-    ucMaxACCol = iACFlags & 0xff;
+    ucMCUFlags = pJPEG->ucMCUFlags;
         
     // my shortcut method appears to violate patent 20020080052
     // but the patent is invalidated by prior art:
@@ -1978,7 +1976,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
 #ifdef HAS_SSE // SSE2 version
     // Columns first
     // even part
-    if (ucMaxACRow == 0) // rows 4-7 are not populated, simpler calculations
+    if (ucMCUFlags < 0x20) // rows 4-7 are not populated, simpler calculations
        {
        // even part
        mmxTemp10 = _mm_loadu_si128((__m128i *)&pMCUSrc[0]); // row 0
@@ -2090,7 +2088,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
     _mm_storeu_si128((__m128i *)&pMCUSrc[56], mmxRow7);
 #endif // HAS_SSE
 #ifdef HAS_NEON
-        if (ucMaxACRow == 0) // rows 4-7 are not populated, simpler calculations
+        if (ucMCUFlags < 0x20) // rows 4-7 are not populated, simpler calculations
            {
            // even part
            mmxTemp10 = vld1q_s16(&pMCUSrc[0]); // row 0
@@ -2333,9 +2331,9 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
     for (iRow=0; iRow<64; iRow+=8) // all rows must be calculated
     {
         // even part
-        if (ucMaxACCol < 0x10) // quick and dirty calculation (right 4 columns are all 0's)
+        if ((ucMCUFlags & 4) == 0) // quick and dirty calculation (right 4 columns are all 0's)
         {
-            if (ucMaxACCol < 0x04) // very likely case (1 or 2 columns occupied)
+            if ((ucMCUFlags & 6) == 0) // very likely case (1 or 2 columns occupied)
             {
                 // even part
                 tmp0 = tmp1 = tmp2 = tmp3 = pMCUSrc[iRow+0];
@@ -4673,7 +4671,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             pJPEG->ucDCTable = cDCTable0;
             // do the first luminance component
             iErr = JPEGDecodeMCU(pJPEG, iLum0, &iDCPred0);
-            if (pJPEG->ucMaxACCol == 0 || bThumbnail) // no AC components, save some time
+            if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
             {
                 pl = (uint32_t *)&pJPEG->sMCUs[iLum0];
                 c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
@@ -4684,13 +4682,13 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             }
             else
             {
-                JPEGIDCT(pJPEG, iLum0, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
+                JPEGIDCT(pJPEG, iLum0, pJPEG->JPCI[0].quant_tbl_no); // first quantization table
             }
             // do the second luminance component
             if (pJPEG->ucSubSample > 0x11) // subsampling
             {
                 iErr |= JPEGDecodeMCU(pJPEG, iLum1, &iDCPred0);
-                if (pJPEG->ucMaxACCol == 0 || bThumbnail) // no AC components, save some time
+                if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
                 {
                     c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
                     l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
@@ -4701,12 +4699,12 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 }
                 else
                 {
-                    JPEGIDCT(pJPEG, iLum1, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
+                    JPEGIDCT(pJPEG, iLum1, pJPEG->JPCI[0].quant_tbl_no); // first quantization table
                 }
                 if (pJPEG->ucSubSample == 0x22)
                 {
                     iErr |= JPEGDecodeMCU(pJPEG, iLum2, &iDCPred0);
-                    if (pJPEG->ucMaxACCol == 0 || bThumbnail) // no AC components, save some time
+                    if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
                     {
                         c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
                         l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
@@ -4717,10 +4715,10 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                     }
                     else
                     {
-                        JPEGIDCT(pJPEG, iLum2, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
+                        JPEGIDCT(pJPEG, iLum2, pJPEG->JPCI[0].quant_tbl_no); // first quantization table
                     }
                     iErr |= JPEGDecodeMCU(pJPEG, iLum3, &iDCPred0);
-                    if (pJPEG->ucMaxACCol == 0 || bThumbnail) // no AC components, save some time
+                    if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
                     {
                         c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
                         l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
@@ -4731,7 +4729,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                     }
                     else
                     {
-                        JPEGIDCT(pJPEG, iLum3, pJPEG->JPCI[0].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // first quantization table
+                        JPEGIDCT(pJPEG, iLum3, pJPEG->JPCI[0].quant_tbl_no); // first quantization table
                     }
                 } // if 2:2 subsampling
             } // if subsampling used
@@ -4741,7 +4739,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 pJPEG->ucACTable = cACTable1;
                 pJPEG->ucDCTable = cDCTable1;
                 iErr |= JPEGDecodeMCU(pJPEG, iCr, &iDCPred1);
-                if (pJPEG->ucMaxACCol == 0 || bThumbnail) // no AC components, save some time
+                if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
                 {
                     c = ucRangeTable[((iDCPred1 * iQuant2) >> 5) & 0x3ff];
                     l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
@@ -4752,13 +4750,13 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 }
                 else
                 {
-                    JPEGIDCT(pJPEG, iCr, pJPEG->JPCI[1].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8))); // second quantization table
+                    JPEGIDCT(pJPEG, iCr, pJPEG->JPCI[1].quant_tbl_no); // second quantization table
                 }
                 // second chroma
                 pJPEG->ucACTable = cACTable2;
                 pJPEG->ucDCTable = cDCTable2;
                 iErr |= JPEGDecodeMCU(pJPEG, iCb, &iDCPred2);
-                if (pJPEG->ucMaxACCol == 0 || bThumbnail) // no AC components, save some time
+                if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
                 {
                     c = ucRangeTable[((iDCPred2 * iQuant3) >> 5) & 0x3ff];
                     l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
@@ -4769,7 +4767,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 }
                 else
                 {
-                    JPEGIDCT(pJPEG, iCb, pJPEG->JPCI[2].quant_tbl_no, (pJPEG->ucMaxACCol | (pJPEG->ucMaxACRow << 8)));
+                    JPEGIDCT(pJPEG, iCb, pJPEG->JPCI[2].quant_tbl_no);
                 }
             } // if color components present
             if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE)

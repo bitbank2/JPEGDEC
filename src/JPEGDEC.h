@@ -190,7 +190,7 @@ typedef struct jpeg_image_tag
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
     uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
     uint8_t iScanStart, iScanEnd, ucFF, ucNumComponents;
-    uint8_t ucACTable, ucDCTable, ucMaxACCol, ucMaxACRow;
+    uint8_t ucACTable, ucDCTable, ucMCUFlags;
     uint8_t ucMemType, ucPixelType;
     int iEXIF; // Offset to EXIF 'TIFF' file
     int iError;
