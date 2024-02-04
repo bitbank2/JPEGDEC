@@ -24,7 +24,7 @@
 
 #ifdef TEENSYDUINO
 #include "my_cm4_simd.h"
-#define HAS_SIMD
+//#define HAS_SIMD
 #endif
 
 #if !defined(NO_SIMD) && (defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7))
@@ -1744,7 +1744,7 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
     my_ulong ulBits; // local copies to allow compiler to use register vars
     uint8_t *pBuf, *pEnd, *pEnd2;
     signed short *pMCU = &pJPEG->sMCUs[iMCU];
-    uint8_t ucMCUFlags;
+    uint16_t u16MCUFlags;
     
     #define MIN_DCT_THRESHOLD 8
         
@@ -1771,7 +1771,7 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
         memset(pMCU, 0, 64*sizeof(short)); // pre-fill with zero since we may skip coefficients
         pEnd2 = (uint8_t *)&cZigZag2[64];
     }
-    ucMCUFlags = 0;
+    u16MCUFlags = 0;
     pZig = (unsigned char *)&cZigZag2[1];
     pEnd = (unsigned char *)&cZigZag2[64];
 
@@ -1849,7 +1849,8 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 ulTemp = ~(my_ulong) (((my_long) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
-                ucMCUFlags |= *pZig; // keep track of occupied columns
+                u16MCUFlags |= 1<<(*pZig & 7); // keep track of occupied columns
+                if (*pZig >= 0x20) u16MCUFlags |= 0x100; // bottom 4 rows
                 pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
@@ -1864,14 +1865,14 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
     }
     else // 10-bit "fast" tables used
     {
-        if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
-        {
-            pBuf += (ulBitOff >> 3);
-            ulBitOff &= 7;
-            ulBits = MOTOLONG(pBuf);
-        }
         while (pZig < pEnd)
         {
+            if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
+            {
+                pBuf += (ulBitOff >> 3);
+                ulBitOff &= 7;
+                ulBits = MOTOLONG(pBuf);
+            }
             ulCode = (ulBits >> (REGISTER_WIDTH - 16 - ulBitOff)) & 0xffff; // get as lower 16 bits
             if (ulCode >= 0xfc00) // first 6 bits = 1, use long table
                 ulCode = (ulCode & 0x7ff); // (ulCode & 0x3ff) + 0x400;
@@ -1882,15 +1883,15 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 return -1;
             ulBitOff += (usHuff >> 8); // add length
             usHuff &= 0xff; // get code (RRRR/SSSS)
+            if (usHuff == 0) // no more AC components
+            {
+                goto mcu_done;
+            }
             if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
             {
                 pBuf += (ulBitOff >> 3);
                 ulBitOff &= 7;
                 ulBits = MOTOLONG(pBuf);
-            }
-            if (usHuff == 0) // no more AC components
-            {
-                goto mcu_done;
             }
             pZig += (usHuff >> 4);  // get the skip amount (RRRR)
             usHuff &= 0xf; // get (SSSS) - extra length
@@ -1900,17 +1901,12 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 ulTemp = ~(my_ulong) (((my_long) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
-                ucMCUFlags |= *pZig; // keep track of occupied columns
+                u16MCUFlags |= 1<<(*pZig & 7); // keep track of occupied columns
+                if (*pZig >= 0x20) u16MCUFlags |= 0x100;
                 pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
             pZig++;
-            if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
-            {
-                pBuf += (ulBitOff >> 3);
-                ulBitOff &= 7;
-                ulBits = MOTOLONG(pBuf);
-            }
       } // while
     } // 10-bit tables
 mcu_done:
@@ -1918,7 +1914,7 @@ mcu_done:
     pJPEG->iVLCOff = (int)(pBuf - pJPEG->ucFileBuf);
     pJPEG->bb.ulBitOff = ulBitOff;
     pJPEG->bb.ulBits = ulBits;
-    pJPEG->ucMCUFlags = ucMCUFlags;
+    pJPEG->u16MCUFlags = u16MCUFlags;
     return 0;
 } /* JPEGDecodeMCU() */
 //
@@ -1934,7 +1930,7 @@ static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable)
     signed int tmp0,tmp1,tmp2,tmp3,tmp4,tmp5;
     signed short *pQuant;
     unsigned char *pOutput;
-    unsigned char ucMCUFlags;
+    uint16_t u16MCUFlags;
     int16_t *pMCUSrc = &pJPEG->sMCUs[iMCUOffset];
 #ifdef HAS_SSE
 __m128i mmxRow0, mmxRow1, mmxRow2, mmxRow3, mmxRow4, mmxRow5, mmxRow6, mmxRow7;
@@ -1947,7 +1943,7 @@ int16x8_t mmxTemp, mmxTemp0, mmxTemp1, mmxTemp2, mmxTemp3, mmxTemp4, mmxTemp5, m
 int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
 #endif // HAS_NEON
  
-    ucMCUFlags = pJPEG->ucMCUFlags;
+    u16MCUFlags = pJPEG->u16MCUFlags;
         
     // my shortcut method appears to violate patent 20020080052
     // but the patent is invalidated by prior art:
@@ -1978,7 +1974,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
 #ifdef HAS_SSE // SSE2 version
     // Columns first
     // even part
-    if (ucMCUFlags < 0x20) // rows 4-7 are not populated, simpler calculations
+    if (u16MCUFlags < 0x100) // rows 4-7 are not populated, simpler calculations
        {
        // even part
        mmxTemp10 = _mm_loadu_si128((__m128i *)&pMCUSrc[0]); // row 0
@@ -2090,7 +2086,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
     _mm_storeu_si128((__m128i *)&pMCUSrc[56], mmxRow7);
 #endif // HAS_SSE
 #ifdef HAS_NEON
-        if (ucMCUFlags < 0x20) // rows 4-7 are not populated, simpler calculations
+        if (u16MCUFlags < 0x100) // rows 4-7 are not populated, simpler calculations
            {
            // even part
            mmxTemp10 = vld1q_s16(&pMCUSrc[0]); // row 0
@@ -2203,13 +2199,13 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
 #endif // HAS_NEON
 #if !defined (HAS_SSE) && !defined(HAS_NEON)
     // do columns first
-    ucColMask = ucMaxACCol | 1; // column 0 must always be calculated
-    for (iCol = 0; iCol < 8 && ucColMask; iCol++)
+    u16MCUFlags |= 1; // column 0 must always be calculated
+    for (iCol = 0; iCol < 8 && u16MCUFlags; iCol++)
     {
-        if (ucColMask & (1<<iCol)) // column has data in it
+        if (u16MCUFlags & (1<<iCol)) // column has data in it
         {
-            ucColMask &= ~(1<<iCol); // unmark this col after use
-            if (!(ucMaxACRow & (1<<iCol))) // simpler calculations if only half populated
+            u16MCUFlags &= ~(1<<iCol); // unmark the col after done
+            if (u16MCUFlags < 0x100) // simpler calculations if only half populated
             {
                 // even part
                 tmp10 = pMCUSrc[iCol] * pQuant[iCol];
@@ -2329,13 +2325,14 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
     } // for each column
 #endif // NO SIMD
     // now do rows
+    u16MCUFlags = pJPEG->u16MCUFlags;
     pOutput = (unsigned char *)pMCUSrc; // store output pixels back into MCU
     for (iRow=0; iRow<64; iRow+=8) // all rows must be calculated
     {
         // even part
-        if ((ucMCUFlags & 4) == 0) // quick and dirty calculation (right 4 columns are all 0's)
+        if ((u16MCUFlags & 0xf0) == 0) // quick and dirty calculation (right 4 columns are all 0's)
         {
-            if ((ucMCUFlags & 6) == 0) // very likely case (1 or 2 columns occupied)
+            if ((u16MCUFlags & 0xfc) == 0) // very likely case (1 or 2 columns occupied)
             {
                 // even part
                 tmp0 = tmp1 = tmp2 = tmp3 = pMCUSrc[iRow+0];
@@ -3871,7 +3868,6 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
      return;
      } // 16bpp
 #endif // HAS_SSE
-
     /* Reference C code */
     /* Convert YCC pixels into RGB pixels and store in output image */
     iYCount = 4;
@@ -4674,7 +4670,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             pJPEG->ucDCTable = cDCTable0;
             // do the first luminance component
             iErr = JPEGDecodeMCU(pJPEG, iLum0, &iDCPred0);
-            if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
+            if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
             {
                 pl = (uint32_t *)&pJPEG->sMCUs[iLum0];
                 c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
@@ -4691,7 +4687,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             if (pJPEG->ucSubSample > 0x11) // subsampling
             {
                 iErr |= JPEGDecodeMCU(pJPEG, iLum1, &iDCPred0);
-                if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
+                if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
                 {
                     c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
                     l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
@@ -4707,7 +4703,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 if (pJPEG->ucSubSample == 0x22)
                 {
                     iErr |= JPEGDecodeMCU(pJPEG, iLum2, &iDCPred0);
-                    if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
+                    if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
                     {
                         c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
                         l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
@@ -4721,7 +4717,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                         JPEGIDCT(pJPEG, iLum2, pJPEG->JPCI[0].quant_tbl_no); // first quantization table
                     }
                     iErr |= JPEGDecodeMCU(pJPEG, iLum3, &iDCPred0);
-                    if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
+                    if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
                     {
                         c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
                         l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
@@ -4742,7 +4738,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 pJPEG->ucACTable = cACTable1;
                 pJPEG->ucDCTable = cDCTable1;
                 iErr |= JPEGDecodeMCU(pJPEG, iCr, &iDCPred1);
-                if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
+                if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
                 {
                     c = ucRangeTable[((iDCPred1 * iQuant2) >> 5) & 0x3ff];
                     l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
@@ -4759,7 +4755,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 pJPEG->ucACTable = cACTable2;
                 pJPEG->ucDCTable = cDCTable2;
                 iErr |= JPEGDecodeMCU(pJPEG, iCb, &iDCPred2);
-                if (pJPEG->ucMCUFlags == 0 || bThumbnail) // no AC components, save some time
+                if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
                 {
                     c = ucRangeTable[((iDCPred2 * iQuant3) >> 5) & 0x3ff];
                     l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);

@@ -29,7 +29,7 @@
 #define PROGMEM
 #endif
 // Cortex-M4/M7 allow unaligned access to SRAM
-#if defined(HAL_ESP32_HAL_H_) || defined(TEENSYDUINO) || defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7) || defined (__x86_64__)
+#if defined(HAL_ESP32_HAL_H_) || defined(TEENSYDUINO) || defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7) || defined (__x86_64__) || defined(TEENSYDUINO)
 #define ALLOWS_UNALIGNED
 #endif
 
@@ -190,8 +190,9 @@ typedef struct jpeg_image_tag
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
     uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
     uint8_t iScanStart, iScanEnd, ucFF, ucNumComponents;
-    uint8_t ucACTable, ucDCTable, ucMCUFlags;
+    uint8_t ucACTable, ucDCTable;
     uint8_t ucMemType, ucPixelType;
+    uint16_t u16MCUFlags;
     int iEXIF; // Offset to EXIF 'TIFF' file
     int iError;
     int iOptions;
