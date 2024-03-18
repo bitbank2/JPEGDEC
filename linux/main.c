@@ -147,7 +147,7 @@ struct timespec res;
 int ConvertFileTest(char *argv[], int iFraction)
 {
     int i, rc;
-    int cx, cy;
+    int cx, cy, bpp;
     int iOption;
     long lTime;
     
@@ -161,7 +161,7 @@ int ConvertFileTest(char *argv[], int iFraction)
        iOption = 0; // full size
     }
 
-    ucPixelType = RGB8888; // generate 32-bit pixels for a Windows BMP file
+    ucPixelType = RGB565_LITTLE_ENDIAN; //RGB8888; // generate 32-bit pixels for a Windows BMP file
     rc = JPEG_openFile(&jpg, argv[1], NULL);
     if (!rc) {
         printf("Error opening file %s\n", argv[1]);
@@ -170,7 +170,13 @@ int ConvertFileTest(char *argv[], int iFraction)
     cx = jpg.iWidth / iFraction;
     cy = jpg.iHeight / iFraction;
     cx = (cx + 7) & 0xfff8; // align on at least 16-byte boundary
-    iDestPitch = (cx * 4); // 32-bits per pixel
+    if (ucPixelType == RGB8888) {
+        iDestPitch = (cx * 4); // 32-bits per pixel
+        bpp = 32;
+    } else {
+        iDestPitch = cx * 2; // 16-bpp
+        bpp = 16;
+    }
     i = iDestPitch * (cy+15);
     pFrame = (uint8_t *)malloc(i);
     if (pFrame == NULL) {
@@ -184,7 +190,7 @@ int ConvertFileTest(char *argv[], int iFraction)
     if (JPEG_decode(&jpg, 0, 0, iOption)) {
         lTime = micros() - lTime;
         printf("JPEG decoded in %d us\n", (int)lTime);
-        WriteBMP(argv[2], pFrame, NULL, cx, cy, 32, iDestPitch);
+        WriteBMP(argv[2], pFrame, NULL, cx, cy, bpp, iDestPitch);
     } else {
         printf("Decode failed, last error = %s\n", szErrors[JPEG_getLastError(&jpg)]);
         return -1;

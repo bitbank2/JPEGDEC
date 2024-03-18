@@ -1850,7 +1850,7 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
                 u16MCUFlags |= 1<<(*pZig & 7); // keep track of occupied columns
-                if (*pZig >= 0x20) u16MCUFlags |= 0x100; // bottom 4 rows
+                u16MCUFlags |= *pZig << 8; // for testing occupied rows
                 pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
@@ -1887,12 +1887,6 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
             {
                 goto mcu_done;
             }
-            if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
-            {
-                pBuf += (ulBitOff >> 3);
-                ulBitOff &= 7;
-                ulBits = MOTOLONG(pBuf);
-            }
             pZig += (usHuff >> 4);  // get the skip amount (RRRR)
             usHuff &= 0xf; // get (SSSS) - extra length
             if (pZig < pEnd2 && usHuff)
@@ -1902,11 +1896,17 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
                 ulCode >>= (REGISTER_WIDTH - usHuff);
                 ulCode -= ulTemp >> (REGISTER_WIDTH - usHuff);
                 u16MCUFlags |= 1<<(*pZig & 7); // keep track of occupied columns
-                if (*pZig >= 0x20) u16MCUFlags |= 0x100;
+                u16MCUFlags |= *pZig << 8; // for testing occupied rows
                 pMCU[*pZig] = (signed short)ulCode; // store AC coefficient (already reordered)
             }
             ulBitOff += usHuff; // add (SSSS) extra length
             pZig++;
+            if (ulBitOff >(REGISTER_WIDTH - 17)) // need to get more data
+            {
+                pBuf += (ulBitOff >> 3);
+                ulBitOff &= 7;
+                ulBits = MOTOLONG(pBuf);
+            }
       } // while
     } // 10-bit tables
 mcu_done:
@@ -1974,7 +1974,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
 #ifdef HAS_SSE // SSE2 version
     // Columns first
     // even part
-    if (u16MCUFlags < 0x100) // rows 4-7 are not populated, simpler calculations
+    if ((u16MCUFlags & 0x2000) == 0) // rows 4-7 are not populated, simpler calculations
        {
        // even part
        mmxTemp10 = _mm_loadu_si128((__m128i *)&pMCUSrc[0]); // row 0
@@ -2086,7 +2086,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
     _mm_storeu_si128((__m128i *)&pMCUSrc[56], mmxRow7);
 #endif // HAS_SSE
 #ifdef HAS_NEON
-        if (u16MCUFlags < 0x100) // rows 4-7 are not populated, simpler calculations
+        if ((u16MCUFlags & 0x2000) == 0) // rows 4-7 are not populated, simpler calculations
            {
            // even part
            mmxTemp10 = vld1q_s16(&pMCUSrc[0]); // row 0
@@ -2205,7 +2205,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
         if (u16MCUFlags & (1<<iCol)) // column has data in it
         {
             u16MCUFlags &= ~(1<<iCol); // unmark the col after done
-            if (u16MCUFlags < 0x100) // simpler calculations if only half populated
+            if ((u16MCUFlags & 0x2000) == 0) // simpler calculations if only half populated
             {
                 // even part
                 tmp10 = pMCUSrc[iCol] * pQuant[iCol];
