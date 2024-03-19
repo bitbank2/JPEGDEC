@@ -3462,6 +3462,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
        int16x8_t i168R, i168G, i168B;
        uint8x8_t u88R, u88G, u88B;
        uint16x8_t u168Temp, u168Temp2;
+       uint8_t ucPixelType = pJPEG->ucPixelType;
        i164Constants = vld1_s16(&sYCCRGBConstants[0]); // 4 different constants used for "lane" multiplications by scalar
 
           for (iRow=0; iRow<8; iRow++) { // do 8 rows
@@ -3495,6 +3496,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
+          if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes
+              vrev16q_u8(u168Temp);
+          }
           vst1q_u16((uint16_t *)pOutput, u168Temp); // top left block
           // top right block
           i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 0); // Cr x 1.402
@@ -3514,6 +3518,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
+          if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes 
+              vrev16q_u8(u168Temp);
+          }
           vst1q_u16((uint16_t *)(pOutput+8), u168Temp); // top right block
           // bottom left block
           i168Temp = vqdmulhq_lane_s16(i168Crx2.val[0], i164Constants, 0); // Cr x 1.402
@@ -3533,6 +3540,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
+          if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes 
+              vrev16q_u8(u168Temp);
+          }
           vst1q_u16((uint16_t *)(pOutput+iPitch), u168Temp); // bottom left block
           // bottom right block
           i168Temp = vqdmulhq_lane_s16(i168Crx2.val[1], i164Constants, 0); // Cr x 1.402
@@ -3551,6 +3561,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
+          if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes 
+              vrev16q_u8(u168Temp);
+          }
           vst1q_u16((uint16_t *)(pOutput+iPitch+8), u168Temp); // bottom right block
           // advance to next pair of lines
           pCr += 8;
