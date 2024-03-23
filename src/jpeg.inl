@@ -3497,7 +3497,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
           if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes
-              vrev16q_u8(u168Temp);
+             u168Temp = vreinterpretq_u16_u8(vrev16q_u8(vreinterpretq_u8_u16(u168Temp))); 
           }
           vst1q_u16((uint16_t *)pOutput, u168Temp); // top left block
           // top right block
@@ -3519,7 +3519,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
           if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes 
-              vrev16q_u8(u168Temp);
+             u168Temp = vreinterpretq_u16_u8(vrev16q_u8(vreinterpretq_u8_u16(u168Temp))); 
           }
           vst1q_u16((uint16_t *)(pOutput+8), u168Temp); // top right block
           // bottom left block
@@ -3541,7 +3541,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
           if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes 
-              vrev16q_u8(u168Temp);
+              u168Temp = vreinterpretq_u16_u8(vrev16q_u8(vreinterpretq_u8_u16(u168Temp))); 
           }
           vst1q_u16((uint16_t *)(pOutput+iPitch), u168Temp); // bottom left block
           // bottom right block
@@ -3562,7 +3562,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
           if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes 
-              vrev16q_u8(u168Temp);
+              u168Temp = vreinterpretq_u16_u8(vrev16q_u8(vreinterpretq_u8_u16(u168Temp)));
           }
           vst1q_u16((uint16_t *)(pOutput+iPitch+8), u168Temp); // bottom right block
           // advance to next pair of lines
