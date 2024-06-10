@@ -2700,7 +2700,8 @@ static void JPEGPixelLE(uint16_t *pDest, int iY, int iCb, int iCr)
 #ifdef HAS_SIMD
     uint32_t ulPixel;
     uint32_t ulCbCr = (iCb | (iCr << 16));
-    uint32_t ulTmp = -1409 | (-2925 << 16); // for green calc
+//    uint32_t ulTmp = -1409 | (-2925 << 16); // for green calc
+    uint32_t ulTmp = 0xfa7f /*-1409*/ | 0xf4930000 /*(-2925 << 16)*/; // for green calc     
     ulCbCr = __SSUB16(ulCbCr, 0x00800080); // dual 16-bit subtraction
     ulPixel = __SMLAD(ulCbCr, ulTmp, iY) >> 14; // G
     ulPixel = __USAT16(ulPixel, 6) << 5; // range limit to 6 bits
@@ -2776,7 +2777,9 @@ static void JPEGPixel2LE(uint16_t *pDest, int iY1, int iY2, int iCb, int iCr)
 //    
 #ifdef HAS_SIMD
     uint32_t ulCbCr = (iCb | (iCr << 16));
-    uint32_t ulTmp2, ulTmp = -1409 | (-2925 << 16); // for green calc
+//    uint32_t ulTmp2, ulTmp = -1409 | (-2925 << 16); // for green calc
+    uint32_t ulTmp2 = 0xfa7f /*-1409*/ | 0xf4930000 /*(-2925 << 16)*/; // for green calc     
+
     ulCbCr = __SSUB16(ulCbCr, 0x00800080); // dual 16-bit subtraction
     ulPixel1 = __SMLAD(ulCbCr, ulTmp, iY1) >> 14; // G for pixel 1
     ulPixel2 = __SMLAD(ulCbCr, ulTmp, iY2) >> 14; // G for pixel 2
