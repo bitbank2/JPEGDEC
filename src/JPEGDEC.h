@@ -56,6 +56,7 @@
 #define MAX_MCU_COUNT 6
 #define MAX_COMPS_IN_SCAN 4
 #define MAX_BUFFERED_PIXELS 2048
+#define MCU_SKIP -8
 
 // Decoder options
 #define JPEG_AUTO_ROTATE 1
@@ -186,6 +187,7 @@ typedef struct jpeg_image_tag
     int iThumbWidth, iThumbHeight; // thumbnail size (if present)
     int iThumbData; // offset to image data
     int iXOffset, iYOffset; // placement on the display
+    int iCropX, iCropY, iCropCX, iCropCY; // crop area
     uint8_t ucBpp, ucSubSample, ucHuffTableUsed;
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
     uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
@@ -237,6 +239,8 @@ class JPEGDEC
     int open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw);
     int open(void *fHandle, int iDataSize, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw);
     void setFramebuffer(void *pFramebuffer);
+    void setCropArea(int x, int y, int w, int h);
+    void getCropArea(int *x, int *y, int *w, int *h);
 
 #ifdef FS_H
     int open(File &file, JPEG_DRAW_CALLBACK *pfnDraw);
@@ -244,6 +248,7 @@ class JPEGDEC
     void close();
     int decode(int x, int y, int iOptions);
     int decodeDither(uint8_t *pDither, int iOptions);
+    int decodeDither(int x, int y, uint8_t *pDither, int iOptions);
     int getOrientation();
     int getWidth();
     int getHeight();
@@ -264,6 +269,8 @@ class JPEGDEC
 #define JPEG_STATIC
 int JPEG_openRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
 void JPEG_setFramebuffer(JPEGIMAGE *pJPEG, void *pFramebuffer);
+void JPEG_setCropArea(JPEGIMAGE *pJPEG, int x, int y, int w, int h);
+void JPEG_getCropArea(JPEGIMAGE *pJPEG, int *x, int *y, int *w, int *h);
 int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw);
 int JPEG_getWidth(JPEGIMAGE *pJPEG);
 int JPEG_getHeight(JPEGIMAGE *pJPEG);

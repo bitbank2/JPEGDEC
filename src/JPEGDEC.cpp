@@ -28,6 +28,9 @@ JPEG_STATIC int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb);
 JPEG_STATIC void JPEGGetMoreData(JPEGIMAGE *pPage);
 JPEG_STATIC int DecodeJPEG(JPEGIMAGE *pImage);
 JPEG_STATIC void JPEG_setFramebuffer(JPEGIMAGE *pPage, void *pFramebuffer);
+void JPEG_setCropArea(JPEGIMAGE *pJPEG, int x, int y, int w, int h);
+void JPEG_getCropArea(JPEGIMAGE *pJPEG, int *x, int *y, int *w, int *h);
+void JPEG_setFramebuffer(JPEGIMAGE *pJPEG, void *pFramebuffer);
 
 // Include the C code which does the actual work
 #include "jpeg.inl"
@@ -129,6 +132,16 @@ int JPEGDEC::getSubSample()
     return (int)_jpeg.ucSubSample;
 } /* getSubSample() */
 
+void JPEGDEC::setCropArea(int x, int y, int w, int h)
+{
+    JPEG_setCropArea(&_jpeg, x, y, w, h);
+} /* setCropArea() */
+
+void JPEGDEC::getCropArea(int *x, int *y, int *w, int *h)
+{
+    JPEG_getCropArea(&_jpeg, x, y, w, h);
+} /* getCropArea() */
+
 //
 // File (SD/MMC) based initialization
 //
@@ -218,6 +231,15 @@ int JPEGDEC::decode(int x, int y, int iOptions)
 void JPEGDEC::setUserPointer(void *p)
 {
     _jpeg.pUser = p;
+}
+
+int JPEGDEC::decodeDither(int x, int y, uint8_t *pDither, int iOptions)
+{
+    _jpeg.iXOffset = x;
+    _jpeg.iYOffset = y;
+    _jpeg.iOptions = iOptions;
+    _jpeg.pDitherBuffer = pDither;
+    return DecodeJPEG(&_jpeg);
 }
 
 int JPEGDEC::decodeDither(uint8_t *pDither, int iOptions)

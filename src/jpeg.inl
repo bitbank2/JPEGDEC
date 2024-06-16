@@ -28,7 +28,7 @@
 #endif
 
 #if !defined(NO_SIMD) && (defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7))
-#define HAS_SIMD
+//#define HAS_SIMD
 #endif
 
 #if defined (ARDUINO_ARCH_ESP32) && !defined(NO_SIMD)
@@ -642,11 +642,6 @@ void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType)
     pJPEG->ucPixelType = (uint8_t)iType;
 } /* JPEG_setPixelType() */
 
-void JPEG_setFramebuffer(JPEGIMAGE *pJPEG, void *pFramebuffer)
-{
-    pJPEG->pFramebuffer = pFramebuffer;
-} /* JPEG_setFramebuffer() */
-
 void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs)
 {
     if (iMaxMCUs < 1)
@@ -676,6 +671,69 @@ void JPEG_close(JPEGIMAGE *pJPEG)
 } /* JPEG_close() */
 
 #endif // !__cplusplus
+
+//
+// Validate/adjust the requested crop area to land on MCU boundaries
+// (expand in all directions if needed)
+//
+void JPEG_setCropArea(JPEGIMAGE *pJPEG, int x, int y, int w, int h)
+{
+    int mcuCX=0, mcuCY=0;
+
+    if (x < 0)
+        x = 0;
+    if (y < 0)
+        y = 0;
+    switch (pJPEG->ucSubSample) // set up the parameters for the different subsampling options
+    {
+        case 0x00: // fake value to handle grayscale
+        case 0x01: // fake value to handle sRGB/CMYK
+        case 0x11:
+            mcuCX = mcuCY = 8;
+            break;
+        case 0x12:
+            mcuCX = 8;
+            mcuCY = 16;
+            break;
+        case 0x21:
+            mcuCX = 16;
+            mcuCY = 8;
+            break;
+        case 0x22:
+            mcuCX = mcuCY = 16;
+            break;
+        default: // to suppress compiler warning
+            break;
+    }
+    if (w & (mcuCX-1)) {
+        w &= ~(mcuCX-1);
+        w += mcuCX;
+    }
+    if (h & (mcuCY-1)) {
+        h &= ~(mcuCY-1);
+        h += mcuCY;
+    }
+    if (x > pJPEG->iWidth-mcuCX) x = pJPEG->iWidth-mcuCX;
+    if (y > pJPEG->iHeight-mcuCY) y = pJPEG->iHeight-mcuCY;
+    if (x + w > pJPEG->iWidth) w = pJPEG->iWidth - mcuCX;
+    if (y + h > pJPEG->iHeight) h = pJPEG->iHeight - mcuCY;
+    x &= ~(mcuCX-1);
+    y &= ~(mcuCY-1);
+    pJPEG->iCropX = x; pJPEG->iCropY = y;
+    pJPEG->iCropCX = w; pJPEG->iCropCY = h;
+} /* JPEG_setCropArea() */
+
+void JPEG_getCropArea(JPEGIMAGE *pJPEG, int *x, int *y, int *w, int *h)
+{
+    *x = pJPEG->iCropX; *y = pJPEG->iCropY;
+    *w = pJPEG->iCropCX; *h = pJPEG->iCropCY;
+} /* JPEG_getCropArea() */
+
+void JPEG_setFramebuffer(JPEGIMAGE *pJPEG, void *pFramebuffer)
+{
+    pJPEG->pFramebuffer = pFramebuffer;
+} /* JPEG_setFramebuffer() */
+
 //
 // Helper functions for memory based images
 //
@@ -1364,8 +1422,10 @@ static int JPEGFilter(uint8_t *pBuf, uint8_t *d, int iLen, uint8_t *bFF)
 #ifdef HAS_NEON
 	uint8x16_t u816FF = vdupq_n_u8(0xff);
 	uint8x16_t u816In, u816Out;
-	uint8x8_t u88Merged;
+#ifdef OLD_NEON
+    uint8x8_t u88Merged;
 	uint32x2_t u322merged;
+#endif // OLD_NEON
 #endif // HAS_NEON
 
     unsigned char c, *s, *pEnd, *pStart;
@@ -1601,8 +1661,9 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
             case 0xffc0: // SOFx - start of frame
                 pPage->ucMode = (uint8_t)usMarker;
                 pPage->ucBpp = s[iOffset+2]; // bits per sample
-                pPage->iHeight = MOTOSHORT(&s[iOffset+3]);
-                pPage->iWidth = MOTOSHORT(&s[iOffset+5]);
+                pPage->iCropX = pPage->iCropY = 0; // initialize crop rectangle to full image size
+                pPage->iCropCY = pPage->iHeight = MOTOSHORT(&s[iOffset+3]);
+                pPage->iCropCX = pPage->iWidth = MOTOSHORT(&s[iOffset+5]);
                 pPage->ucNumComponents = s[iOffset+7];
                 pPage->ucBpp = pPage->ucBpp * pPage->ucNumComponents; /* Bpp = number of components * bits per sample */
                 if (pPage->ucNumComponents == 1)
@@ -1730,7 +1791,9 @@ static void JPEGFixQuantD(JPEGIMAGE *pJPEG)
     }
 } /* JPEGFixQuantD() */
 //
-// Decode the 64 coefficients of the current DCT block
+// Decode the DC and 2-63 AC coefficients of the current DCT block
+// For 1/4 and 1/8 scaled images, we don't store most of the AC values since we
+// won't use them. For skipped MCUs (outside crop area), we don't decode any AC values
 //
 static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
 {
@@ -1752,22 +1815,17 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
     ulBits = pJPEG->bb.ulBits;
     pBuf = pJPEG->bb.pBuf;
         
-    pZig = (unsigned char *)&cZigZag2[1];
-    pEnd = (unsigned char *)&cZigZag2[64];
-    
-    if (ulBitOff > (REGISTER_WIDTH-17)) // need to get more data
-    {
+    if (ulBitOff > (REGISTER_WIDTH-17)) { // need to get more data
         pBuf += (ulBitOff >> 3);
         ulBitOff &= 7;
         ulBits = MOTOLONG(pBuf);
     }
-    if (pJPEG->iOptions & (JPEG_SCALE_QUARTER | JPEG_SCALE_EIGHTH)) // reduced size DCT
-    {
+    if (iMCU < 0) { // skip this block (cropped, or grayscale output from color)
+        pEnd2 = (uint8_t *)&cZigZag2[1]; // we only capture the DC value
+    } else if (pJPEG->iOptions & (JPEG_SCALE_QUARTER | JPEG_SCALE_EIGHTH)) { // reduced size DCT
         pMCU[1] = pMCU[8] = pMCU[9] = 0;
         pEnd2 = (uint8_t *)&cZigZag2[5]; // we only need to store the 4 elements we care about
-    }
-    else
-    {
+    } else { // decode all the AC coefficients
         memset(pMCU, 0, 64*sizeof(short)); // pre-fill with zero since we may skip coefficients
         pEnd2 = (uint8_t *)&cZigZag2[64];
     }
@@ -1810,8 +1868,10 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
             (*iDCPredictor) += (int)ulCode;
         }
     }
-    pMCU[0] = (short)*iDCPredictor; // store in MCU[0]
-    if (pJPEG->ucACTable > 1)
+    if (iMCU >= 0) { // non-skipped block
+        pMCU[0] = (short)*iDCPredictor; // store in MCU[0]
+    }
+    if (pJPEG->ucACTable > 1) // unsupported
         return -1;
     // Now get the other 63 AC coefficients
     pFast = &pJPEG->usHuffAC[pJPEG->ucACTable * HUFF11SIZE];
@@ -1843,7 +1903,7 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
             }
             pZig += (usHuff >> 4);  // get the skip amount (RRRR)
             usHuff &= 0xf; // get (SSSS) - extra length
-            if (pZig < pEnd && usHuff) // && piHisto)
+            if (pZig < pEnd2 && usHuff)
             {
                 ulCode = ulBits << ulBitOff;
                 ulTemp = ~(my_ulong) (((my_long) ulCode) >> (REGISTER_WIDTH-1)); // slide sign bit across other 63 bits
@@ -2408,6 +2468,28 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
         }
 #else
         // I've tried various things to speed this up, but it always seems to take the same amount of time
+#ifdef HAS_NEON
+        {
+            int16x4_t L_in_16x4, R_in_16x4, L_out, R_out;
+            int8x8_t LR_out_8x8;
+            int16x8_t LR_out;
+            L_in_16x4 = vdup_n_s16(tmp0); // suppresses warning of setting lane 0 of uninitialized var
+            L_in_16x4 = vset_lane_s16(tmp1, L_in_16x4, 1);
+            L_in_16x4 = vset_lane_s16(tmp2, L_in_16x4, 2);
+            L_in_16x4 = vset_lane_s16(tmp3, L_in_16x4, 3);
+            R_in_16x4 = vdup_n_s16(tmp7);
+            R_in_16x4 = vset_lane_s16(tmp6, R_in_16x4, 1);
+            R_in_16x4 = vset_lane_s16(tmp5, R_in_16x4, 2);
+            R_in_16x4 = vset_lane_s16(-tmp4, R_in_16x4, 3);
+            L_out = vadd_s16(L_in_16x4, R_in_16x4); // tmp0 + tmp7, tmp1 + tmp6, ...
+            R_out = vsub_s16(L_in_16x4, R_in_16x4); // tmp0 - tmp7, tmp1 - tmp6, ...
+            R_out = vrev64_s16(R_out); // flip order of 4-7
+            LR_out = vcombine_s16(L_out, R_out);
+            LR_out = vaddq_s16(LR_out, vdupq_n_s16(0x80 << 5)); // adjust output +0x80
+            LR_out_8x8 = vqshrun_n_s16(LR_out, 5); // shift, narrow and clip to 0-255
+            vst1_u8(pOutput, LR_out_8x8);
+        }
+#else
         pOutput[0] = ucRangeTable[(((tmp0 + tmp7)>>5) & 0x3ff)];
         pOutput[1] = ucRangeTable[(((tmp1 + tmp6)>>5) & 0x3ff)];
         pOutput[2] = ucRangeTable[(((tmp2 + tmp5)>>5) & 0x3ff)];
@@ -2416,6 +2498,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
         pOutput[5] = ucRangeTable[(((tmp2 - tmp5)>>5) & 0x3ff)];
         pOutput[6] = ucRangeTable[(((tmp1 - tmp6)>>5) & 0x3ff)];
         pOutput[7] = ucRangeTable[(((tmp0 - tmp7)>>5) & 0x3ff)];
+#endif // !HAS_NEON
 #endif
         pOutput += 8;
     } // for each row
@@ -2620,6 +2703,21 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
             }
             return;
         }
+#ifdef ALLOWS_UNALIGNED
+        for (i=0; i<8; i++)
+        {
+            *(uint32_t *)pDest = *(uint32_t *)pSrc; // Y0
+            *(uint32_t *)&pDest[4] = *(uint32_t *)&pSrc[4]; // Y0
+            *(uint32_t *)&pDest[8] = *(uint32_t *)&pSrc[128]; // Y1
+            *(uint32_t *)&pDest[12] = *(uint32_t *)&pSrc[132]; // Y1
+            *(uint32_t *)&pDest[iPitch*8] = *(uint32_t *)&pSrc[256]; // Y2
+            *(uint32_t *)&pDest[(iPitch*8)+4] = *(uint32_t *)&pSrc[260]; // Y2
+            *(uint32_t *)&pDest[(iPitch*8) + 8] = *(uint32_t *)&pSrc[384]; // Y3
+            *(uint32_t *)&pDest[(iPitch*8) + 12] = *(uint32_t *)&pSrc[388]; // Y3
+            pSrc += 8;
+            pDest += iPitch;
+        }
+#else
         for (i=0; i<8; i++)
         {
             for (j=0; j<8; j++)
@@ -2632,6 +2730,7 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
             pSrc += 8;
             pDest += iPitch;
         }
+#endif
     } // 0x22
 } /* JPEGMPutMCU8BitGray() */
 
@@ -2699,13 +2798,13 @@ static void JPEGPixelLE(uint16_t *pDest, int iY, int iCb, int iCr)
 //
 #ifdef HAS_SIMD
     uint32_t ulPixel;
-    uint32_t ulCbCr = (iCb | (iCr << 16));
-//    uint32_t ulTmp = -1409 | (-2925 << 16); // for green calc
-    uint32_t ulTmp = 0xfa7f /*-1409*/ | 0xf4930000 /*(-2925 << 16)*/; // for green calc     
-    ulCbCr = __SSUB16(ulCbCr, 0x00800080); // dual 16-bit subtraction
+    uint32_t ulCbCr;
+    uint32_t ulTmp = 0xfa7f /*-1409*/ | 0xf4930000 /*(-2925 << 16)*/; // for green calc
+    iCb -= 0x80; iCr -= 0x80;
+    ulCbCr = (iCb | (iCr << 16));
     ulPixel = __SMLAD(ulCbCr, ulTmp, iY) >> 14; // G
     ulPixel = __USAT16(ulPixel, 6) << 5; // range limit to 6 bits
-    ulTmp = __SMLAD(7258, ulCbCr, iY) >> 15; // Blue
+    ulTmp = __SMLAD(7258, iCb, iY) >> 15; // Blue
     ulTmp = __USAT16(ulTmp, 5); // range limit to 5 bits
     ulPixel |= ulTmp; // now we have G + B
     ulTmp = __SMLAD(5742, iCr, iY) >> 15; // Red
@@ -2776,17 +2875,17 @@ static void JPEGPixel2LE(uint16_t *pDest, int iY1, int iY2, int iCb, int iCr)
 // off of this function (e.g. Teensy, Arduino Nano 33 BLE, Portenta, etc)
 //    
 #ifdef HAS_SIMD
-    uint32_t ulCbCr = (iCb | (iCr << 16));
-//    uint32_t ulTmp2, ulTmp = -1409 | (-2925 << 16); // for green calc
-    uint32_t ulTmp2 = 0xfa7f /*-1409*/ | 0xf4930000 /*(-2925 << 16)*/; // for green calc     
-
-    ulCbCr = __SSUB16(ulCbCr, 0x00800080); // dual 16-bit subtraction
+    uint32_t ulCbCr;
+    uint32_t ulTmp2 ,ulTmp = 0xfa7f /*-1409*/ | 0xf4930000 /*(-2925 << 16)*/; // for green calc           
+    iCb -= 0x80; iCr -= 0x80;
+    ulCbCr = (iCb | (iCr << 16));
+    //ulCbCr = __SSUB16(ulCbCr, 0x00800080); // dual 16-bit subtraction
     ulPixel1 = __SMLAD(ulCbCr, ulTmp, iY1) >> 14; // G for pixel 1
     ulPixel2 = __SMLAD(ulCbCr, ulTmp, iY2) >> 14; // G for pixel 2
     ulPixel1 |= (ulPixel2 << 16);
     ulPixel1 = __USAT16(ulPixel1, 6) << 5; // range limit both to 6 bits
-    ulTmp = __SMLAD(7258, ulCbCr, iY1) >> 15; // Blue 1
-    ulTmp2 = __SMLAD(7258, ulCbCr, iY2) >> 15; // Blue 2
+    ulTmp = __SMLAD(7258, iCb, iY1) >> 15; // Blue 1
+    ulTmp2 = __SMLAD(7258, iCb, iY2) >> 15; // Blue 2
     ulTmp = __USAT16(ulTmp | (ulTmp2 << 16), 5); // range limit both to 5 bits
     ulPixel1 |= ulTmp; // now we have G + B
     ulTmp = __SMLAD(5742, iCr, iY1) >> 15; // Red 1
@@ -4527,6 +4626,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     int iLum0, iLum1, iLum2, iLum3, iCr, iCb;
     signed int iDCPred0, iDCPred1, iDCPred2;
     int i, iQuant1, iQuant2, iQuant3, iErr;
+    int iSkipMask, bSkipRow;
     uint8_t c;
     int iMCUCount, xoff, iPitch, bThumbnail = 0;
     int bContinue = 1; // early exit if the DRAW callback wants to stop
@@ -4581,14 +4681,14 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         case 0x01: // fake value to handle sRGB/CMYK
         case 0x11:
             cx = (pJPEG->iWidth + 7) >> 3;  // number of MCU blocks
-            cy = (pJPEG->iHeight + 7) >> 3;
+            cy = (pJPEG->iCropY + pJPEG->iCropCY) >> 3;
             iCr = MCU1;
             iCb = MCU2;
             mcuCX = mcuCY = 8;
             break;
         case 0x12:
             cx = (pJPEG->iWidth + 7) >> 3;  // number of MCU blocks
-            cy = (pJPEG->iHeight + 15) >> 4;
+            cy = (pJPEG->iCropY + pJPEG->iCropCY) >> 4;
             iCr = MCU2;
             iCb = MCU3;
             mcuCX = 8;
@@ -4596,7 +4696,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             break;
         case 0x21:
             cx = (pJPEG->iWidth + 15) >> 4;  // number of MCU blocks
-            cy = (pJPEG->iHeight + 7) >> 3;
+            cy = (pJPEG->iCropY + pJPEG->iCropCY) >> 3;
             iCr = MCU2;
             iCb = MCU3;
             mcuCX = 16;
@@ -4604,7 +4704,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             break;
         case 0x22:
             cx = (pJPEG->iWidth + 15) >> 4;  // number of MCU blocks
-            cy = (pJPEG->iHeight + 15) >> 4;
+            cy = (pJPEG->iCropY + pJPEG->iCropCY) >> 4;
             iCr = MCU4;
             iCb = MCU5;
             mcuCX = mcuCY = 16;
@@ -4665,27 +4765,35 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     else
         jd.pPixels = pJPEG->usPixels;
     jd.iHeight = mcuCY;
-    jd.y = pJPEG->iYOffset;
-    for (y = 0; y < cy && bContinue && iErr == 0; y++, jd.y += mcuCY)
+    for (y = 0; y < cy && bContinue && iErr == 0; y++)
     {
+        bSkipRow = (y*mcuCY < pJPEG->iCropY);
         jd.x = pJPEG->iXOffset;
         xoff = 0; // start of new LCD output group
         if (pJPEG->pFramebuffer) { // user-supplied buffer is full width
-            iPitch = (pJPEG->iWidth + 7) & 0xfff8; // must be 16-byte aligned
+            int ty = (y * mcuCY) - pJPEG->iCropY;
+            iPitch = pJPEG->iCropCX; // size of cropped width
             pJPEG->usPixels = (uint16_t *)pJPEG->pFramebuffer;
-            pJPEG->usPixels += (y * mcuCY * iPitch);
-            if (pJPEG->ucPixelType == RGB8888) { // iPitch is 1/2
-                 pJPEG->usPixels += (y * mcuCY * iPitch);
+            if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
+                pJPEG->usPixels += (ty * iPitch/2); // 1 byte per pixel
+            } else  if (pJPEG->ucPixelType == RGB8888) {
+                 pJPEG->usPixels += (ty * iPitch*2); // 4 bytes per pixel
+            } else { // 2 bytes per pixel
+                pJPEG->usPixels += (ty * iPitch);
             }
         } else { // use our internal buffer to do it a block at a time
             iPitch = iMCUCount * mcuCX; // pixels per line of LCD buffer
         }
         for (x = 0; x < cx && bContinue && iErr == 0; x++)
         {
+            iSkipMask = 0; // assume not skipping
+            if (bSkipRow || x*mcuCX < pJPEG->iCropX || x*mcuCX >= pJPEG->iCropX+pJPEG->iCropCX) {
+                iSkipMask = MCU_SKIP;
+            }
             pJPEG->ucACTable = cACTable0;
             pJPEG->ucDCTable = cDCTable0;
             // do the first luminance component
-            iErr = JPEGDecodeMCU(pJPEG, iLum0, &iDCPred0);
+            iErr = JPEGDecodeMCU(pJPEG, iLum0 | iSkipMask, &iDCPred0);
             if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
             {
                 pl = (uint32_t *)&pJPEG->sMCUs[iLum0];
@@ -4702,7 +4810,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             // do the second luminance component
             if (pJPEG->ucSubSample > 0x11) // subsampling
             {
-                iErr |= JPEGDecodeMCU(pJPEG, iLum1, &iDCPred0);
+                iErr |= JPEGDecodeMCU(pJPEG, iLum1 | iSkipMask, &iDCPred0);
                 if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
                 {
                     c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
@@ -4718,7 +4826,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 }
                 if (pJPEG->ucSubSample == 0x22)
                 {
-                    iErr |= JPEGDecodeMCU(pJPEG, iLum2, &iDCPred0);
+                    iErr |= JPEGDecodeMCU(pJPEG, iLum2 | iSkipMask, &iDCPred0);
                     if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
                     {
                         c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
@@ -4732,7 +4840,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                     {
                         JPEGIDCT(pJPEG, iLum2, pJPEG->JPCI[0].quant_tbl_no); // first quantization table
                     }
-                    iErr |= JPEGDecodeMCU(pJPEG, iLum3, &iDCPred0);
+                    iErr |= JPEGDecodeMCU(pJPEG, iLum3 | iSkipMask, &iDCPred0);
                     if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
                     {
                         c = ucRangeTable[((iDCPred0 * iQuant1) >> 5) & 0x3ff];
@@ -4753,74 +4861,80 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 // first chroma
                 pJPEG->ucACTable = cACTable1;
                 pJPEG->ucDCTable = cDCTable1;
-                iErr |= JPEGDecodeMCU(pJPEG, iCr, &iDCPred1);
-                if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
-                {
-                    c = ucRangeTable[((iDCPred1 * iQuant2) >> 5) & 0x3ff];
-                    l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
-                    // dct stores byte values
-                    pl = (uint32_t *)&pJPEG->sMCUs[iCr];
-                    for (i = 0; i<iMaxFill; i++) // 8x8 bytes = 16 longs
-                        pl[i] = l;
-                }
-                else
-                {
-                    JPEGIDCT(pJPEG, iCr, pJPEG->JPCI[1].quant_tbl_no); // second quantization table
-                }
-                // second chroma
-                pJPEG->ucACTable = cACTable2;
-                pJPEG->ucDCTable = cDCTable2;
-                iErr |= JPEGDecodeMCU(pJPEG, iCb, &iDCPred2);
-                if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
-                {
-                    c = ucRangeTable[((iDCPred2 * iQuant3) >> 5) & 0x3ff];
-                    l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
-                    // dct stores byte values
-                    pl = (uint32_t *)&pJPEG->sMCUs[iCb];
-                    for (i = 0; i<iMaxFill; i++) // 8x8 bytes = 16 longs
-                        pl[i] = l;
-                }
-                else
-                {
-                    JPEGIDCT(pJPEG, iCb, pJPEG->JPCI[2].quant_tbl_no);
+                if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
+                    // We're not going to use the color channels, so avoid as much work as possible
+                    iErr |= JPEGDecodeMCU(pJPEG, MCU_SKIP, &iDCPred1); // decode Cr block
+                    iErr |= JPEGDecodeMCU(pJPEG, MCU_SKIP, &iDCPred2); // decode Cb block
+                } else {
+                    iErr |= JPEGDecodeMCU(pJPEG, iCr | iSkipMask, &iDCPred1);
+                    if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
+                    {
+                        c = ucRangeTable[((iDCPred1 * iQuant2) >> 5) & 0x3ff];
+                        l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
+                        // dct stores byte values
+                        pl = (uint32_t *)&pJPEG->sMCUs[iCr];
+                        for (i = 0; i<iMaxFill; i++) // 8x8 bytes = 16 longs
+                            pl[i] = l;
+                    }
+                    else
+                    {
+                        JPEGIDCT(pJPEG, iCr, pJPEG->JPCI[1].quant_tbl_no); // second quantization table
+                    }
+                    // second chroma
+                    pJPEG->ucACTable = cACTable2;
+                    pJPEG->ucDCTable = cDCTable2;
+                    iErr |= JPEGDecodeMCU(pJPEG, iCb | iSkipMask, &iDCPred2);
+                    if (pJPEG->u16MCUFlags == 0 || bThumbnail) // no AC components, save some time
+                    {
+                        c = ucRangeTable[((iDCPred2 * iQuant3) >> 5) & 0x3ff];
+                        l = c | ((uint32_t) c << 8) | ((uint32_t) c << 16) | ((uint32_t) c << 24);
+                        // dct stores byte values
+                        pl = (uint32_t *)&pJPEG->sMCUs[iCb];
+                        for (i = 0; i<iMaxFill; i++) // 8x8 bytes = 16 longs
+                            pl[i] = l;
+                    }
+                    else
+                    {
+                        JPEGIDCT(pJPEG, iCb, pJPEG->JPCI[2].quant_tbl_no);
+                    }
                 }
             } // if color components present
-            if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE)
+            if (!iSkipMask) { // this MCU is not skipped
+                if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
+                    JPEGPutMCU8BitGray(pJPEG, xoff, iPitch); // grayscale or color is being drawn as grayscale
+                } else {
+                    switch (pJPEG->ucSubSample) {
+                        case 0x00: // grayscale
+                            JPEGPutMCUGray(pJPEG, xoff, iPitch);
+                            break;
+                        case 0x11:
+                            JPEGPutMCU11(pJPEG, xoff, iPitch);
+                            break;
+                        case 0x12:
+                            JPEGPutMCU12(pJPEG, xoff, iPitch);
+                            break;
+                        case 0x21:
+                            JPEGPutMCU21(pJPEG, xoff, iPitch);
+                            break;
+                        case 0x22:
+                            JPEGPutMCU22(pJPEG, xoff, iPitch);
+                            break;
+                    } // switch on color option
+                } // normal MCU drawing
+                xoff += mcuCX;
+            } // if not skipped
+            if (pJPEG->pFramebuffer == NULL && (xoff == iPitch || x == cx-1) && !bSkipRow) // time to draw
             {
-                JPEGPutMCU8BitGray(pJPEG, xoff, iPitch);
-            }
-            else
-            {
-                switch (pJPEG->ucSubSample)
-                {
-                    case 0x00: // grayscale
-                        JPEGPutMCUGray(pJPEG, xoff, iPitch);
-                        break;
-                    case 0x11:
-                        JPEGPutMCU11(pJPEG, xoff, iPitch);
-                        break;
-                    case 0x12:
-                        JPEGPutMCU12(pJPEG, xoff, iPitch);
-                        break;
-                    case 0x21:
-                        JPEGPutMCU21(pJPEG, xoff, iPitch);
-                        break;
-                    case 0x22:
-                        JPEGPutMCU22(pJPEG, xoff, iPitch);
-                        break;
-                } // switch on color option
-            }
-            xoff += mcuCX;
-            if (pJPEG->pFramebuffer == NULL && (xoff == iPitch || x == cx-1)) // time to draw
-            {
-                xoff = 0;
                 jd.iWidth = jd.iWidthUsed = iPitch; // width of each LCD block group
                 jd.pUser = pJPEG->pUser;
                 if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dither to 4/2/1 bits
                     JPEGDither(pJPEG, cx * mcuCX, mcuCY);
                 if ((x+1)*mcuCX > pJPEG->iWidth) { // right edge has clipped pixels
                    jd.iWidthUsed = iPitch - (cx*mcuCX - pJPEG->iWidth);
+                } else if (jd.x + iPitch > pJPEG->iCropCX) { // not a full width
+                    jd.iWidthUsed = pJPEG->iCropCX - jd.x;
                 }
+                jd.y = pJPEG->iYOffset + (y * mcuCY) - pJPEG->iCropY;
                 if ((jd.y - pJPEG->iYOffset + mcuCY) > (pJPEG->iHeight>>iScaleShift)) { // last row needs to be trimmed
                    jd.iHeight = (pJPEG->iHeight>>iScaleShift) - (jd.y - pJPEG->iYOffset);
                 }
@@ -4828,6 +4942,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 jd.x += iPitch;
                 if ((cx - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
                     iPitch = (cx - 1 - x) * mcuCX;
+                xoff = 0;
             }
             if (pJPEG->iResInterval)
             {
