@@ -4739,6 +4739,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         iMCUCount = cx; // don't go wider than the image
     if (iMCUCount > pJPEG->iMaxMCUs) // did the user set an upper bound on how many pixels per JPEGDraw callback?
         iMCUCount = pJPEG->iMaxMCUs;
+    if (pJPEG->iCropCX != (cx * mcuCX)) { // crop enabled
+        iMCUCount = 1; // do it 1 at a time to simplify the logic
+    }
     if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dithered, override the max MCU count
         iMCUCount = cx; // do the whole row
     jd.iBpp = 16;
@@ -4923,7 +4926,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 } // normal MCU drawing
                 xoff += mcuCX;
             } // if not skipped
-            if (pJPEG->pFramebuffer == NULL && (xoff == iPitch || x == cx-1) && !bSkipRow) // time to draw
+            if (pJPEG->pFramebuffer == NULL && (xoff == iPitch || x == cx-1) && !iSkipMask) // time to draw
             {
                 jd.iWidth = jd.iWidthUsed = iPitch; // width of each LCD block group
                 jd.pUser = pJPEG->pUser;
