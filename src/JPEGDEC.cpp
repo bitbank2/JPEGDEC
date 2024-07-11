@@ -142,6 +142,11 @@ void JPEGDEC::getCropArea(int *x, int *y, int *w, int *h)
     JPEG_getCropArea(&_jpeg, x, y, w, h);
 } /* getCropArea() */
 
+int JPEGDEC::getJPEGType()
+{
+    return (_jpeg.ucMode == 0xc2) ? JPEG_MODE_PROGRESSIVE : JPEG_MODE_BASELINE;
+} /* getJPEGType() */
+
 //
 // File (SD/MMC) based initialization
 //

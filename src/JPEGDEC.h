@@ -84,6 +84,13 @@ typedef uint32_t my_ulong;
 typedef int32_t my_long;
 #endif
 
+// Supported decode modes
+enum {
+    JPEG_MODE_BASELINE = 0,
+    JPEG_MODE_PROGRESSIVE,
+    JPEG_MODE_INVALID
+};
+
 // Pixel types (defaults to little endian RGB565)
 enum {
     RGB565_LITTLE_ENDIAN = 0,
@@ -255,6 +262,7 @@ class JPEGDEC
     int getBpp();
     void setUserPointer(void *p);
     int getSubSample();
+    int getJPEGType();
     int hasThumb();
     int getThumbWidth();
     int getThumbHeight();
