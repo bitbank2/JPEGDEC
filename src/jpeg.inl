@@ -71,7 +71,6 @@ static void closeFile(void *handle);
 #endif
 static void JPEGDither(JPEGIMAGE *pJPEG, int iWidth, int iHeight);
 /* JPEG tables */
-const int iBitMasks[33] = {0,1,3,7,0xf,0x1f,0x3f,0x7f,0xff,0x1ff,0x3ff,0x7ff,0x0fff,0x1fff,0x3fff,0x7fff,0xffff,0x1ffff,0x3ffff,0x7ffff,0xfffff,0x1fffff,0x3fffff,0x7fffff,0xffffff,0x1ffffff,0x3ffffff,0x7ffffff,0xfffffff,0x1fffffff,0x3fffffff,0x7fffffff,1};
 // zigzag ordering of DCT coefficients
 static const unsigned char cZigZag[64] = {0,1,5,6,14,15,27,28,
     2,4,7,13,16,26,29,42,
@@ -1628,8 +1627,9 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
         }
         switch (usMarker)
         {
-            case 0xffc1: // extended mode
-            case 0xffc3: // lossless mode
+            case 0xffc1:
+            case 0xffc2:
+            case 0xffc3:
                 pPage->iError = JPEG_UNSUPPORTED_FEATURE;
                 return 0; // currently unsupported modes
                 
@@ -1658,8 +1658,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                     }
                 }
                 break;
-            case 0xffc0: // SOFx - start of frame (baseline)
-            case 0xffc2: // (progressive)
+            case 0xffc0: // SOFx - start of frame
                 pPage->ucMode = (uint8_t)usMarker;
                 pPage->ucBpp = s[iOffset+2]; // bits per sample
                 pPage->iCropX = pPage->iCropY = 0; // initialize crop rectangle to full image size
@@ -1791,282 +1790,6 @@ static void JPEGFixQuantD(JPEGIMAGE *pJPEG)
         }
     }
 } /* JPEGFixQuantD() */
-/****************************************************************************
- *                                                                          *
- *  FUNCTION   : JPEGDecodeMCU_P(char *, int *, int *, int *, JPEGDATA *)   *
- *                                                                          *
- *  PURPOSE    : Decompress a macro block of Progressive JPEG data.         *
- *                                                                          *
- ****************************************************************************/
-static int JPEGDecodeMCU_P(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
-{
-    int iCount;
-    int iIndex;
-    uint32_t ulCode;
-    unsigned char ucHuff, *pFastDC;
-    unsigned short *pFast;
-    uint32_t usHuff; // this prevents an unnecessary & 65535 for shorts
-    signed int iPositive, iNegative, iCoeff;
-    signed short *pMCU = &pJPEG->sMCUs[iMCU];
-    uint32_t ulBitOff;
-    my_ulong ulBits, ulTemp; // local copies to allow compiler to use register vars
-    uint8_t *pBuf;
-
-    ulBitOff = pJPEG->bb.ulBitOff;
-    ulBits = pJPEG->bb.ulBits;
-    pBuf = pJPEG->bb.pBuf;
-        
-    if (ulBitOff > (REGISTER_WIDTH-17)) { // need to get more data
-        pBuf += (ulBitOff >> 3);
-        ulBitOff &= 7;
-        ulBits = MOTOLONG(pBuf);
-    }
-
-    iPositive = (1 << pJPEG->cApproxBitsLow); // positive bit position being coded
-    iNegative = ((-1) << pJPEG->cApproxBitsLow); // negative bit position being coded
-        
-    if (pJPEG->iScanStart == 0)
-    {
-        if (pJPEG->cApproxBitsHigh) // successive approximation - simply encodes the specified bit
-        {
-            ulCode = (ulBits >> (31-ulBitOff)) & 1; // just get 1 bit
-            ulBitOff += 1;
-            if (ulCode)
-            {
-                //            (*iDCPredictor) |= iPositive;  // in case the scan is run more than once
-                //            pMCU[0] = *iDCPredictor; // store in MCU[0]
-                pMCU[0] |= iPositive;
-            }
-            goto mcu_done; // that's it
-        }
-        // get the DC component
-        ulCode = (ulBits >> (32 - 12 - ulBitOff)) & 0xfff; // get as lower 12 bits
-        if (ulCode >= 0xf80) // long code
-            ulCode = (ulCode & 0xff); // point to long table
-        else
-            ulCode >>= 6; // use first 6 bits of short code
-        pFastDC = &pJPEG->ucHuffDC[pJPEG->ucDCTable * DC_TABLE_SIZE];
-        ucHuff = pFastDC[ulCode]; // get the length+code
-        if (ucHuff == 0) // invalid code
-            return -1;
-        ulBitOff += (ucHuff >> 4); // add the Huffman length
-        ucHuff &= 0xf; // get the actual code (SSSS)
-        if (ucHuff) // if there is a change to the DC value
-        { // get the 'extra' bits
-            if (ulBitOff > (REGISTER_WIDTH - 17)) // need to get more data
-            {
-                pBuf += (ulBitOff >> 3);
-                ulBitOff &= 7;
-                ulBits = MOTOLONG(pBuf);
-            }
-            ulCode = ulBits << ulBitOff;
-            ulTemp = ~(my_ulong)(((my_long)ulCode)>>(REGISTER_WIDTH-1)); // slide sign bit across other 63/31 bits
-            ulCode >>= (REGISTER_WIDTH - ucHuff);
-            ulCode -= ulTemp>>(REGISTER_WIDTH-ucHuff);
-            ulBitOff += ucHuff; // add bit length
-            ulCode <<= pJPEG->cApproxBitsLow; // successive approximation shift value
-            (*iDCPredictor) += ulCode;
-        }
-        pMCU[0] = (short)*iDCPredictor; // store in MCU[0]
-    }
-    // Now get the other 63 AC coefficients
-    pFast = &pJPEG->usHuffAC[pJPEG->ucACTable * HUFF11SIZE];
-    if (pJPEG->iScanStart)
-        iIndex = pJPEG->iScanStart; // starting index of this scan (progressive JPEG)
-    else
-        iIndex = 1; // special case when the DC component is included
-    if (pJPEG->cApproxBitsHigh) // successive approximation - different method
-    {
-        if (1)
-//        if (*iSkip == 0) // only decode this block if not being skipped in EOB run
-        {
-            for (; iIndex <= pJPEG->iScanEnd; iIndex++)
-            {
-                if (ulBitOff > (REGISTER_WIDTH-17)) { // need to get more data
-                    pBuf += (ulBitOff >> 3);
-                    ulBitOff &= 7;
-                    ulBits = MOTOLONG(pBuf);
-                }
-                ulCode = (ulBits >> (REGISTER_WIDTH - 16 - ulBitOff)) & 0xffff; // get as lower 16 bits
-                if (ulCode >= 0xf000) // first 4 bits = 1, use long table
-                    ulCode = (ulCode & 0x1fff);
-                else
-                    ulCode >>= 4; // use lower 12 bits (short table)
-                usHuff = pFast[ulCode];
-                if (usHuff == 0) // invalid code
-                    return -1;
-                ulBitOff += (usHuff >> 8); // add length
-                usHuff &= 0xff; // get code (RRRR/SSSS)
-                iCoeff = 0;
-                if (usHuff & 0xf)
-                {
-                    if ((usHuff & 0xf) != 1)   // size of new coefficient should always be one
-                        return -1;
-                    ulCode = (ulBits >> (REGISTER_WIDTH-1-ulBitOff)) & 1; // just get 1 bit
-                    ulBitOff += 1;
-                    if (ulCode) // 1 means use positive value; 0 = use negative
-                        iCoeff = iPositive;
-                    else
-                        iCoeff = iNegative;
-                }
-                else // since SSSS = 0, must be a ZRL or EOBn code
-                {
-                    if (usHuff != 0xf0) // ZRL
-                    { // EOBn code
-                        usHuff = (usHuff >> 4); // get the number of extra bits needed to code the count
-                        ulCode = ulBits >> (REGISTER_WIDTH - usHuff - ulBitOff); // shift down by (SSSS) - extra length
-                        ulCode &= iBitMasks[usHuff];
-                        ulCode += (1 << usHuff); // plus base amount
-                        ulBitOff += usHuff; // add extra length
-                        //*iSkip = ulCode; // return this skip amount
-                        break;
-                    }
-                }
-                // Advance over already-nonzero coefficients and RRRR still-zero coefficients
-                // appending correction bits to the nonzeroes.  A correction bit is 1 if the abs
-                // value of the coefficient must be increased.
-                iCount = (usHuff >> 4); // get RRRR in lower 4 bits
-                do {
-                    if (pMCU[iIndex])
-                    {
-                        if (ulBitOff > (REGISTER_WIDTH-17)) { // need to get more data
-                            pBuf += (ulBitOff >> 3);
-                            ulBitOff &= 7;
-                            ulBits = MOTOLONG(pBuf);
-                        }
-                        ulCode = (ulBits >> (REGISTER_WIDTH-1-ulBitOff)) & 1; // just get 1 bit
-                        ulBitOff++;
-                        if (ulCode)
-                        {
-                            if ((pMCU[iIndex] & iPositive) == 0) // only combine if not already done
-                            {
-                                if (pMCU[iIndex] >= 0)
-                                    pMCU[iIndex] += (short)iPositive;
-                                else
-                                    pMCU[iIndex] += (short)iNegative;
-                            }
-                        }
-                    }
-                    else // count the zero coeffs to skip
-                    {
-                        if (--iCount < 0)
-                            break;      // done skipping zeros
-                    }
-                    iIndex++;
-                } while (iIndex <= pJPEG->iScanEnd);
-                if (iCoeff && iIndex < 0x40) // store the non-zero coefficient
-                    pMCU[iIndex] = (short) iCoeff;
-            } // for - AC coeffs
-        } // if not skipped
-        if (0)
-//        if (*iSkip) // scan any remaining coefficient positions after the end-of-band
-        {
-            for (; iIndex <= pJPEG->iScanEnd; iIndex++)
-            {
-                if (pMCU[iIndex]) // only non-zero ones need correction
-                {
-                    if (ulBitOff > 15) // need to grab more bytes to nibble on
-                    {
-                        pBuf += 2; // grab 2 more bytes since that's what we really need
-                        ulBitOff -= 16;
-                        ulBits <<= 16;
-                        ulBits |= MOTOSHORT(&pBuf[2]);
-                    }
-                    ulCode = ulBits >> (REGISTER_WIDTH - 1 - ulBitOff); // get 1 bit
-                    ulBitOff++;
-                    if (ulCode & 1)   // correction bit
-                    {
-                        if ((pMCU[iIndex] & iPositive) == 0) // only combine if not already done
-                        {
-                            if (pMCU[iIndex] >= 0)
-                                pMCU[iIndex] += (short)iPositive;
-                            else
-                                pMCU[iIndex] += (short)iNegative;
-                        }
-                    }  // if correction bit
-                }  // if coeff is non-zero
-            } // for the rest of the AC coefficients
-         //   (*iSkip)--; // count this block as completed
-        }  // if this block is being skipped
-    } // if successive approx
-    else // normal AC decoding
-    {
-       // if (*iSkip == 0) // if this block is not being skipped in a EOB run
-        {
-            while (iIndex <= pJPEG->iScanEnd)
-            {
-                if (ulBitOff > 15) // need to grab more bytes to nibble on
-                {
-                    pBuf += 2; // grab 2 more bytes since that's what we really need
-                    ulBitOff -= 16;
-                    ulBits <<= 16;
-                    ulBits |= MOTOSHORT(&pBuf[2]);
-                }
-                ulCode = (ulBits >> (REGISTER_WIDTH - 16 - ulBitOff)) & 0xffff; // get as lower 16 bits
-                if (ulCode >= 0xf000) // first 4 bits = 1, use long table
-                    ulCode = (ulCode & 0x1fff);
-                else
-                    ulCode >>= 4; // use lower 12 bits (short table)
-                usHuff = pFast[ulCode];
-                if (usHuff == 0) // invalid code
-                    return -1;
-                ulBitOff += (usHuff >> 8); // add length
-                usHuff &= 0xff; // get code (RRRR/SSSS)
-                //            if (usHuff == 0) // no more AC components
-                //               {
-                //               goto mcu_done;
-                //               }
-                if (usHuff == 0xf0) // is it ZRL?
-                {
-                    iIndex += 16; // skip 16 AC coefficients
-                }
-                else
-                {
-                    if (ulBitOff > 15)
-                    {
-                        pBuf += 2; // grab 2 more bytes since that's what we really need
-                        ulBitOff -= 16;
-                        ulBits <<= 16;
-                        ulBits |= MOTOSHORT(&pBuf[2]);
-                    }
-                    if ((usHuff & 0xf) == 0) // special case for encoding EOB (end-of-band) codes (SSSS=0)
-                    {
-                        usHuff = (usHuff >> 4); // get the number of extra bits needed to code the count
-                        ulCode = ulBits >> (REGISTER_WIDTH - usHuff - ulBitOff); // shift down by (SSSS) - extra length
-                        ulCode &= iBitMasks[usHuff];
-                        ulCode += (1 << usHuff); // plus base amount
-                        ulBitOff += usHuff; // add extra length
-                       // *iSkip = ulCode; // return this skip amount
-                        break;
-                    }
-                    else
-                    {
-                        iIndex += (usHuff >> 4); // skip amount
-                        usHuff &= 0xf; // get (SSSS) - extra length
-                        ulCode = ulBits << ulBitOff;
-                        ulCode >>= (32 - usHuff);
-                        if (!(ulCode & 0x80000000>>(REGISTER_WIDTH - 16 - -usHuff))) // test for negative
-                            ulCode -= 0xffffffff>>(REGISTER_WIDTH - 16 - -usHuff);
-                        ulBitOff += usHuff; // add (SSSS) extra length
-                        ulCode <<= pJPEG->cApproxBitsLow; // successive approximation shift value
-                        pMCU[iIndex++] = (signed short)ulCode; // store AC coefficient
-                    }
-                }
-            } // while
-        } // if this block not skipped
-    //    if (*iSkip)
-    //        (*iSkip)--; // count this block as being completed (or skipped)
-    } // end of non-successive approx code
-mcu_done:
-    pBuf += ulBitOff >> 3;
-    ulBitOff &= 7;
-    pJPEG->bb.pBuf = pBuf;
-    pJPEG->iVLCOff = (int)(pBuf - pJPEG->ucFileBuf);
-    pJPEG->bb.ulBitOff = ulBitOff;
-    pJPEG->bb.ulBits = ulBits;
-    return 0;
-    
-} /* JPEGDecodeMCU_P() */
 //
 // Decode the DC and 2-63 AC coefficients of the current DCT block
 // For 1/4 and 1/8 scaled images, we don't store most of the AC values since we
@@ -2150,9 +1873,6 @@ static int JPEGDecodeMCU(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
     }
     if (pJPEG->ucACTable > 1) // unsupported
         return -1;
-    if (pJPEG->iScanEnd == 0) { // first scan of progressive has only DC values
-        return 0; // we're done
-    }
     // Now get the other 63 AC coefficients
     pFast = &pJPEG->usHuffAC[pJPEG->ucACTable * HUFF11SIZE];
     if (pJPEG->b11Bit) // 11-bit "slow" tables used
@@ -4916,9 +4636,6 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     int iMaxFill = 16, iScaleShift = 0;
 
     // Requested the Exif thumbnail
-    if (pJPEG->ucMode == 0xc2) { // progressive mode - we only decode the first scan (DC values)
-        pJPEG->iOptions |= JPEG_SCALE_EIGHTH; // return 1/8 sized image
-    }
     if (pJPEG->iOptions & JPEG_EXIF_THUMBNAIL)
     {
         if (pJPEG->iThumbData == 0 || pJPEG->iThumbWidth == 0) // doesn't exist
@@ -4964,14 +4681,14 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         case 0x01: // fake value to handle sRGB/CMYK
         case 0x11:
             cx = (pJPEG->iWidth + 7) >> 3;  // number of MCU blocks
-            cy = (pJPEG->iCropY + pJPEG->iCropCY) >> 3;
+            cy = (pJPEG->iCropY + pJPEG->iCropCY + 7) >> 3;
             iCr = MCU1;
             iCb = MCU2;
             mcuCX = mcuCY = 8;
             break;
         case 0x12:
             cx = (pJPEG->iWidth + 7) >> 3;  // number of MCU blocks
-            cy = (pJPEG->iCropY + pJPEG->iCropCY) >> 4;
+            cy = (pJPEG->iCropY + pJPEG->iCropCY + 15) >> 4;
             iCr = MCU2;
             iCb = MCU3;
             mcuCX = 8;
@@ -4979,7 +4696,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             break;
         case 0x21:
             cx = (pJPEG->iWidth + 15) >> 4;  // number of MCU blocks
-            cy = (pJPEG->iCropY + pJPEG->iCropCY) >> 3;
+            cy = (pJPEG->iCropY + pJPEG->iCropCY + 7) >> 3;
             iCr = MCU2;
             iCb = MCU3;
             mcuCX = 16;
@@ -4987,7 +4704,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             break;
         case 0x22:
             cx = (pJPEG->iWidth + 15) >> 4;  // number of MCU blocks
-            cy = (pJPEG->iCropY + pJPEG->iCropCY) >> 4;
+            cy = (pJPEG->iCropY + pJPEG->iCropCY + 15) >> 4;
             iCr = MCU4;
             iCb = MCU5;
             mcuCX = mcuCY = 16;
@@ -5022,14 +4739,11 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         iMCUCount = cx; // don't go wider than the image
     if (iMCUCount > pJPEG->iMaxMCUs) // did the user set an upper bound on how many pixels per JPEGDraw callback?
         iMCUCount = pJPEG->iMaxMCUs;
-    if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) { // dithered, override the max MCU count
-        iMCUCount = cx; // do the whole row
-    }
     if (pJPEG->iCropCX != (cx * mcuCX)) { // crop enabled
-        if (iMCUCount * mcuCX > pJPEG->iCropCX) {
-            iMCUCount = (pJPEG->iCropCX / mcuCX); // maximum width is the crop width
-        }
+        iMCUCount = 1; // do it 1 at a time to simplify the logic
     }
+    if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dithered, override the max MCU count
+        iMCUCount = cx; // do the whole row
     jd.iBpp = 16;
     switch (pJPEG->ucPixelType)
     {
@@ -5076,7 +4790,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         for (x = 0; x < cx && bContinue && iErr == 0; x++)
         {
             iSkipMask = 0; // assume not skipping
-            if (bSkipRow || x*mcuCX < pJPEG->iCropX || x*mcuCX > pJPEG->iCropX+pJPEG->iCropCX) {
+            if (bSkipRow || x*mcuCX < pJPEG->iCropX || x*mcuCX >= pJPEG->iCropX+pJPEG->iCropCX) {
                 iSkipMask = MCU_SKIP;
             }
             pJPEG->ucACTable = cACTable0;
@@ -5229,9 +4943,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 }
                 bContinue = (*pJPEG->pfnDraw)(&jd);
                 jd.x += iPitch;
-                if (pJPEG->iCropCX != (cx * mcuCX) && (iPitch + jd.x) > (pJPEG->iCropX + pJPEG->iCropCX)) { // image is cropped, don't go past end
-                    iPitch = pJPEG->iCropCX - jd.x; // x=0 of output is really pJPEG->iCropx
-                } else if ((cx - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
+                if ((cx - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
                     iPitch = (cx - 1 - x) * mcuCX;
                 xoff = 0;
             }
