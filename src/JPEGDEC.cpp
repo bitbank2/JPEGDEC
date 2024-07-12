@@ -72,7 +72,7 @@ int JPEGDEC::openRAM(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
     return JPEGInit(&_jpeg);
 } /* openRAM() */
 
-int JPEGDEC::openFLASH(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
+int JPEGDEC::openFLASH(const uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     memset(&_jpeg, 0, sizeof(JPEGIMAGE));
     _jpeg.ucMemType = JPEG_MEM_FLASH;
@@ -82,10 +82,10 @@ int JPEGDEC::openFLASH(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDra
     _jpeg.pfnOpen = NULL;
     _jpeg.pfnClose = NULL;
     _jpeg.JPEGFile.iSize = iDataSize;
-    _jpeg.JPEGFile.pData = pData;
+    _jpeg.JPEGFile.pData = (uint8_t *)pData;
     _jpeg.iMaxMCUs = 1000; // set to an unnaturally high value to start
     return JPEGInit(&_jpeg);
-} /* openRAM() */
+} /* openFLASH() */
 
 int JPEGDEC::getOrientation()
 {
