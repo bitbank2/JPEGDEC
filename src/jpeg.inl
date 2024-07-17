@@ -3133,7 +3133,7 @@ static void JPEGPixelRGB(uint32_t *pDest, int iY, int iCb, int iCr)
     i32 = ((iCBB + iY) >> 12);
     if (i32 < 0) i32 = 0;
     else if (i32 > 255) i32 = 255;
-    u32Pixel |= (uint32_t)i32; // blue
+    u32Pixel |= (uint32_t)(i32<<16); // blue
     i32 = ((iCBG + iCRG + iY) >> 12); // green pixel
     if (i32 < 0) i32 = 0;
     else if (i32 > 255) i32 = 255;
@@ -3141,7 +3141,7 @@ static void JPEGPixelRGB(uint32_t *pDest, int iY, int iCb, int iCr)
     i32 = ((iCRR + iY) >> 12); // red pixel
     if (i32 < 0) i32 = 0;
     else if (i32 > 255) i32 = 255;
-    u32Pixel |= (uint32_t)(i32 << 16);
+    u32Pixel |= (uint32_t)(i32);
     pDest[0] = u32Pixel;
 } /* JPEGPixelRGB() */
 
@@ -3221,7 +3221,7 @@ static void JPEGPixel2RGB(uint32_t *pDest, int32_t iY1, int32_t iY2, int32_t iCb
     if (i32 < 0) i32 = 0;
     else if (i32 > 255) i32 = 255;
     u32Pixel1 = u32Pixel2 = 0xff000000; // Alpha = 255
-    u32Pixel1 |= (uint32_t)i32; // blue
+    u32Pixel1 |= (uint32_t)(i32<<16); // blue
     i32 = ((iCBG + iCRG + iY1) >> 12); // green pixel
     if (i32 < 0) i32 = 0;
     else if (i32 > 255) i32 = 255;
@@ -3229,12 +3229,12 @@ static void JPEGPixel2RGB(uint32_t *pDest, int32_t iY1, int32_t iY2, int32_t iCb
     i32 = ((iCRR + iY1) >> 12); // red pixel
     if (i32 < 0) i32 = 0;
     else if (i32 > 255) i32 = 255;
-    u32Pixel1 |= (uint32_t)(i32 << 16); // red
+    u32Pixel1 |= (uint32_t)i32; // red
 
     i32 = ((iCBB + iY2) >> 12); // blue pixel
     if (i32 < 0) i32 = 0;
     else if (i32 > 255) i32 = 255;
-    u32Pixel2 |= (uint32_t)i32;
+    u32Pixel2 |= (uint32_t)(i32<<16);
     i32 = ((iCBG + iCRG + iY2) >> 12); // green pixel
     if (i32 < 0) i32 = 0;
     else if (i32 > 255) i32 = 255;
@@ -3242,7 +3242,7 @@ static void JPEGPixel2RGB(uint32_t *pDest, int32_t iY1, int32_t iY2, int32_t iCb
     i32 = ((iCRR + iY2) >> 12); // red pixel
     if (i32 < 0) i32 = 0;
     else if (i32 > 255) i32 = 255;
-    u32Pixel2 |= (uint32_t)(i32 << 16);
+    u32Pixel2 |= (uint32_t)i32;
     pDest[0] = u32Pixel1;
     pDest[1] = u32Pixel2;
 } /* JPEGPixel2RGB() */

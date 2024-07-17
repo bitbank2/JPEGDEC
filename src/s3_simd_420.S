@@ -117,7 +117,7 @@
   ee.vzip.16 q7,q2  # create RGB8888 pixels
   ee.vst.128.ip q7,a5,16  # store 8 x RGB8888 pixels = 32 bytes
   ee.vst.128.ip q2,a5,16
-  addi.n a6,a6,-16         # restore pointer to start of 16-bit constants
+  addi.n a6,a6,-12         # restore pointer to start of 16-bit constants
   ee.vld.l.64.ip    q0,a2,0   # load right 8 Y values into Q0
   ee.movi.32.q q1,a3,0        # restore second 4 values of Cb
   ee.movi.32.q q2,a4,0        # restore second 4 values of Cr
