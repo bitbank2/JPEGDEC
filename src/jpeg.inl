@@ -5245,8 +5245,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 jd.pUser = pJPEG->pUser;
                 if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dither to 4/2/1 bits
                     JPEGDither(pJPEG, cx * mcuCX, mcuCY);
-                if ((x+1)*mcuCX > pJPEG->iWidth) { // right edge has clipped pixels
-                   jd.iWidthUsed = iPitch - (cx*mcuCX - pJPEG->iWidth);
+                if (jd.x + iPitch > pJPEG->iWidth) { // right edge has clipped pixels
+                   jd.iWidthUsed = pJPEG->iWidth - jd.x;
                 } else if (jd.x + iPitch > pJPEG->iCropCX) { // not a full width
                     jd.iWidthUsed = pJPEG->iCropCX - jd.x;
                 }
