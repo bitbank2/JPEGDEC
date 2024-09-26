@@ -4216,7 +4216,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxTemp = _mm_or_si128(mmxR, mmxG); // R+G
          mmxTemp = _mm_or_si128(mmxTemp, mmxB); // R+G+B
          // store first row of right block
-         _mm_storeu_si128((__m128i *)(pOutput+16), mmxTemp); // write 8 RGB565 pixels
+         _mm_storeu_si128((__m128i *)(pOutput+8), mmxTemp); // write 8 RGB565 pixels
          // prepare second row of right block
          mmxY = _mm_loadl_epi64((__m128i *)(pY+136)); // load 1 row of Y (right block)
          mmxTemp2 = _mm_setzero_si128(); // zero it to use to set upper bits to 0
@@ -4248,7 +4248,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxTemp = _mm_or_si128(mmxR, mmxG); // R+G
          mmxTemp = _mm_or_si128(mmxTemp, mmxB); // R+G+B
          // store second row of right block
-         _mm_storeu_si128((__m128i *)(pOutput+16+iPitch), mmxTemp); // write 8 RGB565 pixels
+         _mm_storeu_si128((__m128i *)(pOutput+8+iPitch), mmxTemp); // write 8 RGB565 pixels
 
          pOutput += iPitch*2;
          pCr += 8;
