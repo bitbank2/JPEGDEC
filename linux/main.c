@@ -169,7 +169,7 @@ int ConvertFileTest(char *argv[], int iFraction)
     }
     cx = jpg.iWidth / iFraction;
     cy = jpg.iHeight / iFraction;
-    cx = (cx + 7) & 0xfff8; // align on at least 16-byte boundary
+    //cx = (cx + 7) & 0xfff8; // align on at least 16-byte boundary
     if (ucPixelType == RGB8888) {
         iDestPitch = (cx * 4); // 32-bits per pixel
         bpp = 32;

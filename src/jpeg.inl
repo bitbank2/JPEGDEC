@@ -3015,7 +3015,7 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
 static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
 {
     uint16_t *usDest = (uint16_t *)&pJPEG->usPixels[x];
-    int i, j, xcount, ycount;
+    int i, j, xcount, ycount, delta;
     uint8_t *pSrc = (uint8_t *)&pJPEG->sMCUs[0];
     
     if (pJPEG->iOptions & JPEG_SCALE_HALF) // special handling of 1/2 size (pixel averaging)
@@ -3047,10 +3047,16 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
         return;
     }
     xcount = ycount = 8; // debug
-    if (pJPEG->iOptions & JPEG_SCALE_QUARTER)
+    delta = 0;
+    if (pJPEG->iOptions & JPEG_SCALE_QUARTER) {
         xcount = ycount = 2;
-    else if (pJPEG->iOptions & JPEG_SCALE_EIGHTH)
+    } else if (pJPEG->iOptions & JPEG_SCALE_EIGHTH) {
         xcount = ycount = 1;
+    } else {
+        if (x + 8 > pJPEG->iWidth) {
+            xcount = pJPEG->iWidth & 7; // final block is partial width
+        }
+    }
     for (i=0; i<ycount; i++) // do up to 8 rows
     {
         if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
@@ -3065,6 +3071,7 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
         }
         usDest -= xcount;
         usDest += iPitch; // next line
+        pSrc += delta;
     }
 } /* JPEGPutMCUGray() */
 
