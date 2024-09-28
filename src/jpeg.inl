@@ -2982,33 +2982,39 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
             return;
         }
 #ifdef ALLOWS_UNALIGNED
-        for (i=0; i<8; i++)
-        {
-            *(uint32_t *)pDest = *(uint32_t *)pSrc; // Y0
-            *(uint32_t *)&pDest[4] = *(uint32_t *)&pSrc[4]; // Y0
-            *(uint32_t *)&pDest[8] = *(uint32_t *)&pSrc[128]; // Y1
-            *(uint32_t *)&pDest[12] = *(uint32_t *)&pSrc[132]; // Y1
-            *(uint32_t *)&pDest[iPitch*8] = *(uint32_t *)&pSrc[256]; // Y2
-            *(uint32_t *)&pDest[(iPitch*8)+4] = *(uint32_t *)&pSrc[260]; // Y2
-            *(uint32_t *)&pDest[(iPitch*8) + 8] = *(uint32_t *)&pSrc[384]; // Y3
-            *(uint32_t *)&pDest[(iPitch*8) + 12] = *(uint32_t *)&pSrc[388]; // Y3
-            pSrc += 8;
-            pDest += iPitch;
+        if (x + 16 <= iPitch) { // no cropping needed
+            for (i=0; i<8; i++) {
+                *(uint32_t *)pDest = *(uint32_t *)pSrc; // Y0
+                *(uint32_t *)&pDest[4] = *(uint32_t *)&pSrc[4]; // Y0
+                *(uint32_t *)&pDest[8] = *(uint32_t *)&pSrc[128]; // Y1
+                *(uint32_t *)&pDest[12] = *(uint32_t *)&pSrc[132]; // Y1
+                *(uint32_t *)&pDest[iPitch*8] = *(uint32_t *)&pSrc[256]; // Y2
+                *(uint32_t *)&pDest[(iPitch*8)+4] = *(uint32_t *)&pSrc[260]; // Y2
+                *(uint32_t *)&pDest[(iPitch*8) + 8] = *(uint32_t *)&pSrc[384]; // Y3
+                *(uint32_t *)&pDest[(iPitch*8) + 12] = *(uint32_t *)&pSrc[388]; // Y3
+                pSrc += 8;
+                pDest += iPitch;
+            }
+            return;
         }
-#else
+#endif
+        xcount = iPitch - x;
         for (i=0; i<8; i++)
         {
             for (j=0; j<8; j++)
             {
-                pDest[j] = pSrc[j]; // Y0
-                pDest[j+8] = pSrc[j+128]; // Y1
-                pDest[iPitch*8 + j] = pSrc[j+256]; // Y2
-                pDest[iPitch*8 + j + 8] = pSrc[j + 384]; // Y3
+                if (j < xcount) {
+                    pDest[j] = pSrc[j]; // Y0
+                    pDest[iPitch*8 + j] = pSrc[j+256]; // Y2
+                }
+                if (j+8 < xcount) {
+                    pDest[j+8] = pSrc[j+128]; // Y1
+                    pDest[iPitch*8 + j + 8] = pSrc[j + 384]; // Y3
+                }
             }
             pSrc += 8;
             pDest += iPitch;
         }
-#endif
     } // 0x22
 } /* JPEGMPutMCU8BitGray() */
 
@@ -3053,8 +3059,9 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
     } else if (pJPEG->iOptions & JPEG_SCALE_EIGHTH) {
         xcount = ycount = 1;
     } else {
-        if (x + 8 > pJPEG->iWidth) {
-            xcount = pJPEG->iWidth & 7; // final block is partial width
+        if (x + 8 > iPitch) {
+            xcount = iPitch - x; // final block is partial width
+            delta = 8 - xcount;
         }
     }
     for (i=0; i<ycount; i++) // do up to 8 rows
