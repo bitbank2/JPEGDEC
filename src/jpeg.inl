@@ -3265,7 +3265,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
 {
     int iCr, iCb;
     signed int Y;
-    int iCol;
+    int iCol, w, delta;
     int iRow;
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
@@ -3380,12 +3380,14 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
     }
 // full size
 #ifdef ESP32S3_SIMD
-    if (pJPEG->ucPixelType == RGB8888) iPitch *= 2;
-    for (iRow=0; iRow<8; iRow++) {
-        s3_ycbcr_convert_444(pY, pCb, pCr, pOutput, i16_Consts, pJPEG->ucPixelType);
-        pCb += 8; pCr += 8; pY += 8; pOutput += iPitch;
-    }
+    if (x + 8 <= iPitch) { // only for non-clipped MCUs
+        if (pJPEG->ucPixelType == RGB8888) iPitch *= 2;
+        for (iRow=0; iRow<8; iRow++) {
+            s3_ycbcr_convert_444(pY, pCb, pCr, pOutput, i16_Consts, pJPEG->ucPixelType);
+            pCb += 8; pCr += 8; pY += 8; pOutput += iPitch;
+        }
     return;
+    }
 #endif // ESP32S3_SIMD
 
 #ifdef HAS_SSE
@@ -3498,35 +3500,44 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
      }
 #endif // HAS_SSE
 
+// C reference version
+    w = 8; delta = 0;
+    if (x + 8 > iPitch) {
+        w = iPitch - x;
+        delta = 8 - w;
+    }
     for (iRow=0; iRow<8; iRow++) // up to 8 rows to do
     {
         if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
         {
-            for (iCol=0; iCol<8; iCol++) // up to 4x2 cols to do
+            for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
             {
                 iCr = *pCr++;
                 iCb = *pCb++;
                 Y = (int)(*pY++) << 12;
                 JPEGPixelLE(pOutput+iCol, Y, iCb, iCr);
             } // for col
+            pCr += delta; pCb += delta;
         }
         else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
         {
-            for (iCol=0; iCol<8; iCol++) // up to 4x2 cols to do
+            for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
             {
                 iCr = *pCr++;
                 iCb = *pCb++;
                 Y = (int)(*pY++) << 12;
                 JPEGPixelBE(pOutput+iCol, Y, iCb, iCr);
             } // for col
+            pCr += delta; pCb += delta;
         } else { // RGB888
-            for (iCol=0; iCol<8; iCol++) // up to 4x2 cols to do
+            for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
             {
                 iCr = *pCr++;
                 iCb = *pCb++;
                 Y = (int)(*pY++) << 12;
                 JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y, iCb, iCr);
             } // for col
+            pCr += delta; pCb += delta;
         }
         pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
     } // for row
