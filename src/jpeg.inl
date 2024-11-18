@@ -5268,6 +5268,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             } // if not skipped
             if (pJPEG->pFramebuffer == NULL && (xoff == iPitch || x == cx-1) && !iSkipMask) // time to draw
             {
+                int iAdjust = (1<<iScaleShift)-1;
                 jd.iWidth = jd.iWidthUsed = iPitch; // width of each LCD block group
                 jd.pUser = pJPEG->pUser;
                 if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) // dither to 4/2/1 bits
@@ -5278,8 +5279,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                     jd.iWidthUsed = pJPEG->iCropCX - jd.x;
                 }
                 jd.y = pJPEG->iYOffset + (y * mcuCY) - pJPEG->iCropY;
-                if ((jd.y - pJPEG->iYOffset + mcuCY) > (pJPEG->iHeight>>iScaleShift)) { // last row needs to be trimmed
-                   jd.iHeight = (pJPEG->iHeight>>iScaleShift) - (jd.y - pJPEG->iYOffset);
+                if ((jd.y - pJPEG->iYOffset + mcuCY) > ((pJPEG->iHeight+iAdjust)>>iScaleShift)) { // last row needs to be trimmed
+                   jd.iHeight = ((pJPEG->iHeight+iAdjust)>>iScaleShift) - (jd.y - pJPEG->iYOffset);
                 }
                 bContinue = (*pJPEG->pfnDraw)(&jd);
                 jd.x += iPitch;
