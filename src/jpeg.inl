@@ -3380,7 +3380,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
     }
 // full size
 #ifdef ESP32S3_SIMD
-    if (x + 8 <= iPitch) { // only for non-clipped MCUs
+    if (x + 8 <= iPitch && (iPitch & 15) == 0) { // only for non-clipped MCUs
         if (pJPEG->ucPixelType == RGB8888) iPitch *= 2;
         for (iRow=0; iRow<8; iRow++) {
             s3_ycbcr_convert_444(pY, pCb, pCr, pOutput, i16_Consts, pJPEG->ucPixelType);
@@ -3732,20 +3732,22 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
     }
 // full size
 #ifdef ESP32S3_SIMD
-    if (pJPEG->ucPixelType == RGB8888) iPitch *= 2;
-    for (iRow=0; iRow<4; iRow++) { // top L+R, 4 pairs of lines x 16 pixels
-        // each call converts 16 pixels
-        s3_ycbcr_convert_420(pY, pCb, pCr, pOutput, i16_Consts, pJPEG->ucPixelType);
-        s3_ycbcr_convert_420(pY+8, pCb, pCr, pOutput+iPitch, i16_Consts, pJPEG->ucPixelType);
-        pCb += 8; pCr += 8; pY += 16; pOutput += iPitch*2;
+    if (x + 8 <= iPitch && (iPitch & 15) == 0) { // only for non-clipped MCUs
+        if (pJPEG->ucPixelType == RGB8888) iPitch *= 2;
+        for (iRow=0; iRow<4; iRow++) { // top L+R, 4 pairs of lines x 16 pixels
+            // each call converts 16 pixels
+            s3_ycbcr_convert_420(pY, pCb, pCr, pOutput, i16_Consts, pJPEG->ucPixelType);
+            s3_ycbcr_convert_420(pY+8, pCb, pCr, pOutput+iPitch, i16_Consts, pJPEG->ucPixelType);
+            pCb += 8; pCr += 8; pY += 16; pOutput += iPitch*2;
+        }
+        pY += (256 - 64);
+        for (iRow=0; iRow<4; iRow++) { // bottom L+R
+            s3_ycbcr_convert_420(pY, pCb, pCr, pOutput, i16_Consts, pJPEG->ucPixelType);
+            s3_ycbcr_convert_420(pY+8, pCb, pCr, pOutput+iPitch, i16_Consts, pJPEG->ucPixelType);
+            pCb += 8; pCr += 8; pY += 16; pOutput += iPitch*2;
+        }
+        return;
     }
-    pY += (256 - 64);
-    for (iRow=0; iRow<4; iRow++) { // bottom L+R
-        s3_ycbcr_convert_420(pY, pCb, pCr, pOutput, i16_Consts, pJPEG->ucPixelType);
-        s3_ycbcr_convert_420(pY+8, pCb, pCr, pOutput+iPitch, i16_Consts, pJPEG->ucPixelType);
-        pCb += 8; pCr += 8; pY += 16; pOutput += iPitch*2;
-    }
-    return;
 #endif // ESP32S3_SIMD
 
 #ifdef HAS_NEON
@@ -4290,21 +4292,21 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
     /* Convert YCC pixels into RGB pixels and store in output image */
     iYCount = 4;
     bUseOdd1 = bUseOdd2 = 1; // assume odd column can be used
-    if ((x+15) >= pJPEG->iWidth)
+    if ((x+15) >= iPitch)
     {
-        iCol = (((pJPEG->iWidth & 15)+1) >> 1);
+        iCol = (((iPitch & 15)+1) >> 1);
         if (iCol >= 4)
         {
             iXCount1 = 4;
             iXCount2 = iCol-4;
-            if (pJPEG->iWidth & 1 && (iXCount2 * 2) + 8 + (x * 16) > pJPEG->iWidth)
+            if (iPitch & 1 && (iXCount2 * 2) + 8 + (x * 16) > iPitch)
                 bUseOdd2 = 0;
         }
         else
         {
             iXCount1 = iCol;
             iXCount2 = 0;
-            if (pJPEG->iWidth & 1 && (iXCount1 * 2) + (x * 16) > pJPEG->iWidth)
+            if (iPitch & 1 && (iXCount1 * 2) + (x * 16) > iPitch)
                 bUseOdd1 = 0;
         }
     }
