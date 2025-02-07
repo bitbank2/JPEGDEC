@@ -268,6 +268,7 @@ class JPEGDEC
     int getThumbHeight();
     int getLastError();
     void setPixelType(int iType); // defaults to little endian
+    int getPixelType();
     void setMaxOutputSize(int iMaxMCUs);
 
   private:
