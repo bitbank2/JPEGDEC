@@ -31,7 +31,7 @@
 //#define HAS_SIMD
 #endif
 
-#if defined (ARDUINO_ARCH_ESP32) && !defined(NO_SIMD)
+#if defined (ARDUINO_ESP32S3_DEV) && !defined(NO_SIMD)
 #include "dsps_fft2r_platform.h"
 #if (dsps_fft2r_sc16_aes3_enabled == 1)
 #define ESP32S3_SIMD
