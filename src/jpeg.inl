@@ -1605,6 +1605,9 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                 iOffset = 0;
                 (*pPage->pfnSeek)(&pPage->JPEGFile, iFilePos);
                 iBytesRead = 0; // throw away any old data
+            } else if (iOffset >= iBytesRead) { // something went very wrong
+                pPage->iError = JPEG_DECODE_ERROR;
+                return 0;
             }
             // move existing bytes down
             if (iOffset)
@@ -1644,13 +1647,11 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                     iTagCount = TIFFSHORT(&s[iOffset+16], bMotorola);
                     GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8);
                     // The second IFD defines the thumbnail (if present)
-                    if (iTagCount >= 1 && iTagCount < 32) // valid number of tags for EXIF data 'page'
-                    {
+                    if (iTagCount >= 1 && iTagCount < 32) { // valid number of tags for EXIF data 'page'
                        // point to next IFD
                         IFD += (12 * iTagCount) + 2;
                         IFD = TIFFLONG(&s[IFD + iOffset + 8], bMotorola);
-                        if (IFD != 0) // Thumbnail present?
-                        {
+                        if (IFD != 0 && IFD + iOffset < JPEG_FILE_BUF_SIZE) { // Thumbnail present?
                             pPage->ucHasThumb = 1;
                             GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8); // info for second 'page' of TIFF
                             pPage->iThumbData += iOffset + 8; // absolute offset in the file

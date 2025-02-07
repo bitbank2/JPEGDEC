@@ -12,6 +12,11 @@
 #include <time.h>
 #include "../../../src/JPEGDEC.cpp"
 #include "../../../test_images/tulips.h" // 640x480 56k byte test image
+#include "corrupt1.h" // invalid header offsets
+#include "corrupt2.h" // global buffer overflow 1
+#include "corrupt3.h" // global buffer overflow 2
+#include "corrupt4.h" // FPE 1
+#include "corrupt5.h" // FPE 2
 #define LOOP_COUNT 100
 
 JPEGDEC jpg;
@@ -134,6 +139,86 @@ int main(int argc, const char * argv[]) {
     } else {
         JPEGLOG(__LINE__, szTestName, " - FAILED");
     }
+    // Test 4 - open a corrupt image without crashing
+    szTestName = (char *)"JPEG purposely corrupt image 1";
+    JPEGLOG(__LINE__, szTestName, szStart);
+    if (jpg.openFLASH((uint8_t *)corrupt1, sizeof(corrupt1), JPEGDraw)) {
+        jpg.decode(0,0,0);
+        jpg.close();
+    }
+    JPEGLOG(__LINE__, szTestName, " - PASSED");
+
+    // Test 5 - open a corrupt image without crashing
+    szTestName = (char *)"JPEG purposely corrupt image 2";
+    JPEGLOG(__LINE__, szTestName, szStart);
+    if (jpg.openFLASH((uint8_t *)corrupt2, sizeof(corrupt2), JPEGDraw)) {
+        jpg.decode(0,0,0);
+        jpg.close();
+    }
+    JPEGLOG(__LINE__, szTestName, " - PASSED");
+
+    // Test 6 - open a corrupt image without crashing
+    szTestName = (char *)"JPEG purposely corrupt image 3";
+    JPEGLOG(__LINE__, szTestName, szStart);
+    if (jpg.openFLASH((uint8_t *)corrupt3, sizeof(corrupt3), JPEGDraw)) {
+        jpg.decode(0,0,0);
+        jpg.close();
+    }
+    JPEGLOG(__LINE__, szTestName, " - PASSED");
+
+    // Test 7 - open a corrupt image without crashing
+    szTestName = (char *)"JPEG purposely corrupt image 4";
+    JPEGLOG(__LINE__, szTestName, szStart);
+    if (jpg.openFLASH((uint8_t *)FPE1, sizeof(FPE1), JPEGDraw)) {
+        jpg.decode(0,0,0);
+        jpg.close();
+    }
+    JPEGLOG(__LINE__, szTestName, " - PASSED");
+
+    // Test 8 - open a corrupt image without crashing
+    szTestName = (char *)"JPEG purposely corrupt image 5";
+    JPEGLOG(__LINE__, szTestName, szStart);
+    if (jpg.openFLASH((uint8_t *)FPE2, sizeof(FPE2), JPEGDraw)) {
+        jpg.decode(0,0,0);
+        jpg.close();
+    }
+    JPEGLOG(__LINE__, szTestName, " - PASSED");
+
+    // FUZZ testing
+    // Randomize the input data (file header and compressed data) and confirm that the library returns an error code
+    // and doesn't have an invalid pointer exception
+    printf("Begin fuzz testing...\n");
+    szTestName = (char *)"Single Byte Sequential Corruption Test";
+    pFuzzData = (uint8_t *)malloc(sizeof(tulips));
+    JPEGLOG(__LINE__, szTestName, szStart);
+    // We don't need to corrupt the file all the way to the end because it will take a loooong time
+    // The header is the main area where corruption can cause erratic behavior
+    for (i=0; i<2000; i++) { // corrupt each byte one at a time by inverting it
+        memcpy(pFuzzData, tulips, sizeof(tulips)); // start with the valid data
+        pFuzzData[i] = ~pFuzzData[i]; // invert the bits of this byte
+        if (jpg.openFLASH((uint8_t *)tulips, sizeof(tulips), JPEGDraw)) { // the JPEG header may be rejected
+            rc = jpg.decode(0,0,0);
+            jpg.close();
+        }
+    } // for each test
+    JPEGLOG(__LINE__, szTestName, " - PASSED");
+    szTestName = (char *)"Multi-Byte Random Corruption Test";
+    JPEGLOG(__LINE__, szTestName, szStart);
+    for (i=0; i<1000; i++) { // 1000 iterations of random spots in the file to corrupt with random values
+        int iOffset;
+        memcpy(pFuzzData, tulips, sizeof(tulips)); // start with the valid data
+        iOffset = rand() % sizeof(tulips);
+        pFuzzData[iOffset] = (uint8_t)rand();
+        iOffset = rand() % sizeof(tulips); // corrupt 2 spots just for good measure
+        pFuzzData[iOffset] = (uint8_t)rand();
+        if (jpg.openFLASH((uint8_t *)tulips, sizeof(tulips), JPEGDraw)) { // the JPEG header may be rejected
+            rc = jpg.decode(0,0,0);
+            jpg.close();
+        }
+    } // for each test
+    JPEGLOG(__LINE__, szTestName, " - PASSED");
+
+    free(pFuzzData);
 #ifdef FUTURE
     // Test 5
     // Test that the performance of requesting a partial decode is not the same as a full decode
@@ -192,39 +277,6 @@ int main(int argc, const char * argv[]) {
     } else {
         JPEGLOG(__LINE__, szTestName, " - FAILED");
     }
-    // FUZZ testing
-    // Randomize the input data (file header and compressed data) and confirm that the library returns an error code
-    // and doesn't have an invalid pointer exception
-    printf("Begin fuzz testing...\n");
-    szTestName = (char *)"Single Byte Sequential Corruption Test";
-    pFuzzData = (uint8_t *)malloc(sizeof(weather_icons));
-    JPEGLOG(__LINE__, szTestName, szStart);
-    for (i=0; i<sizeof(weather_icons); i++) { // corrupt each byte one at a time by inverting it
-        memcpy(pFuzzData, weather_icons, sizeof(weather_icons)); // start with the valid data
-        pFuzzData[i] = ~pFuzzData[i]; // invert the bits of this byte
-        if (g4.openTIFF((uint8_t *)pFuzzData, (int)sizeof(weather_icons), TIFFDraw)) { // the TIFF header may be rejected
-            rc = g4.decode();
-            g4.close();
-        }
-    } // for each test
-    JPEGLOG(__LINE__, szTestName, " - PASSED");
-    szTestName = (char *)"Multi-Byte Random Corruption Test";
-    JPEGLOG(__LINE__, szTestName, szStart);
-    for (i=0; i<10000; i++) { // 10000 iterations of random spots in the file to corrupt with random values
-        int iOffset;
-        memcpy(pFuzzData, weather_icons, sizeof(weather_icons)); // start with the valid data
-        iOffset = rand() % sizeof(weather_icons);
-        pFuzzData[iOffset] = (uint8_t)rand();
-        iOffset = rand() % sizeof(weather_icons); // corrupt 2 spots just for good measure
-        pFuzzData[iOffset] = (uint8_t)rand();
-        if (g4.openTIFF((uint8_t *)pFuzzData, (int)sizeof(weather_icons), TIFFDraw)) { // the TIFF header may be rejected
-            rc = g4.decode();
-            g4.close();
-        }
-    } // for each test
-    JPEGLOG(__LINE__, szTestName, " - PASSED");
-
-    free(pFuzzData);
 #endif // FUTURE
     return 0;
 }
