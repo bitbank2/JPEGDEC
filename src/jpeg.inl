@@ -1606,7 +1606,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                 (*pPage->pfnSeek)(&pPage->JPEGFile, iFilePos);
                 iBytesRead = 0; // throw away any old data
             }
-            if (iOffset >= iBytesRead) { // something went wrong
+            if (iOffset > iBytesRead) { // something went wrong
                 pPage->iError = JPEG_DECODE_ERROR;
                 return 0;
             }
