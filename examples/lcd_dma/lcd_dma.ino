@@ -16,13 +16,19 @@
 // If you use a single buffer, you run the risk of new data overwriting old data
 // before it has been transmitted.
 //
+// JPEGDEC DMA Feature
+// The JPEGDEC library includes internal support for managing a ping-pong buffer
+// scheme to allow your code to simply use the pixel data without worrying about it
+// getting overwritten. The JPEG_USES_DMA flag, when passed to the decode() method,
+// tells JPEGDEC to split the internal pixel buffer in half and alternate using the
+// two halves with each call to JPEGDraw.
+//
 #include <bb_spi_lcd.h>
 #include <JPEGDEC.h>
 #include "../../test_images/zebra.h"
 
 JPEGDEC jpg;
 BB_SPI_LCD lcd;
-uint8_t *pTemp; // temporary buffer for each block of pixels
 bool bDMA; // a flag for our JPEGDraw function to know if DMA should be enabled
 //
 // Draw callback from JPEG decoder
@@ -32,22 +38,14 @@ bool bDMA; // a flag for our JPEGDraw function to know if DMA should be enabled
 // color subsampling option of the JPEG image
 // Each call can have a large group (e.g. 128x16) of pixels
 //
+// For this example, we set a global boolean value (bDMA) to indicate whether or not
+// we should ask the display library to transmit the pixels using DMA
+// JPEGDEC manages the ping-pong buffers, so we don't have to.
+//
 int JPEGDraw(JPEGDRAW *pDraw)
 {
-  if (bDMA) {
-    // DMA enabled means that the SPI/QSPI hardware of the MCU is transmitting the data
-    // while the CPU can go back to work decoding the next block of pixels.
-    // If we pass the pixel pointer to the DMA system, JPEGDEC may overwrite pixels
-    // that are in the process of being transmitted with new pixels being decoded.
-    // To avoid this situation, we'll copy the pixels JPEGDEC gave us into another
-    // buffer to ensure that they don't get clobbered.
-    memcpy(pTemp, pDraw->pPixels, pDraw->iWidth * pDraw->iHeight * sizeof(uint16_t));
-    lcd.setAddrWindow(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
-    lcd.pushPixels((uint16_t *)pTemp, pDraw->iWidth * pDraw->iHeight, DRAW_TO_LCD | DRAW_WITH_DMA);
-  } else { // without DMA enabled, the pushPixels call will wait for all data to be sent
-    lcd.setAddrWindow(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
-    lcd.pushPixels((uint16_t *)pDraw->pPixels, pDraw->iWidth * pDraw->iHeight, DRAW_TO_LCD);
-  }
+  lcd.setAddrWindow(pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
+  lcd.pushPixels((uint16_t *)pDraw->pPixels, pDraw->iWidth * pDraw->iHeight, (bDMA) ? DRAW_TO_LCD | DRAW_WITH_DMA : DRAW_TO_LCD);
   return 1;
 } /* JPEGDraw() */
 
@@ -56,7 +54,6 @@ void setup()
   int xoff, yoff;
   long lTime;
 
-  pTemp = (uint8_t *)malloc(320*16*2); // maximum possible space to hold temporary pixels 
   lcd.begin(DISPLAY_WS_AMOLED_18); // set this to the correct display type for your board
   lcd.fillScreen(TFT_BLACK);
   lcd.setTextColor(TFT_GREEN, TFT_BLACK);
@@ -85,12 +82,11 @@ void setup()
       xoff = (lcd.width() - jpg.getWidth())/2;
       yoff = (lcd.height() - jpg.getHeight())/2;
       lTime = millis();
-      jpg.decode(xoff,yoff,0); // center the image and no options bits (0)
+      jpg.decode(xoff,yoff, JPEG_USES_DMA); // center the image and prepare for DMA
       lTime = millis() - lTime; // total time to decode + display
       lcd.setCursor(20, lcd.height()-16);
       lcd.printf("With DMA, decoded in %d ms", (int)lTime);
   }
-  free(pTemp);
 } /* setup() */
 
 void loop()

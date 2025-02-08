@@ -66,6 +66,7 @@
 #define JPEG_LE_PIXELS 16
 #define JPEG_EXIF_THUMBNAIL 32
 #define JPEG_LUMA_ONLY 64
+#define JPEG_USES_DMA 128
 
 #define MCU0 (DCTSIZE * 0)
 #define MCU1 (DCTSIZE * 1)

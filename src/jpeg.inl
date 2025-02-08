@@ -31,7 +31,7 @@
 //#define HAS_SIMD
 #endif
 
-#if defined (ARDUINO_ESP32S3_DEV) && !defined(NO_SIMD)
+#if defined (ARDUINO_ARCH_ESP32) && !defined(NO_SIMD)
 #include "dsps_fft2r_platform.h"
 #if (dsps_fft2r_sc16_aes3_enabled == 1)
 #define ESP32S3_SIMD
@@ -1605,9 +1605,6 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                 iOffset = 0;
                 (*pPage->pfnSeek)(&pPage->JPEGFile, iFilePos);
                 iBytesRead = 0; // throw away any old data
-            } else if (iOffset >= iBytesRead) { // something went very wrong
-                pPage->iError = JPEG_DECODE_ERROR;
-                return 0;
             }
             // move existing bytes down
             if (iOffset)
@@ -1647,11 +1644,13 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                     iTagCount = TIFFSHORT(&s[iOffset+16], bMotorola);
                     GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8);
                     // The second IFD defines the thumbnail (if present)
-                    if (iTagCount >= 1 && iTagCount < 32) { // valid number of tags for EXIF data 'page'
+                    if (iTagCount >= 1 && iTagCount < 32) // valid number of tags for EXIF data 'page'
+                    {
                        // point to next IFD
                         IFD += (12 * iTagCount) + 2;
                         IFD = TIFFLONG(&s[IFD + iOffset + 8], bMotorola);
-                        if (IFD != 0 && IFD + iOffset < JPEG_FILE_BUF_SIZE) { // Thumbnail present?
+                        if (IFD != 0) // Thumbnail present?
+                        {
                             pPage->ucHasThumb = 1;
                             GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8); // info for second 'page' of TIFF
                             pPage->iThumbData += iOffset + 8; // absolute offset in the file
@@ -4933,6 +4932,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     signed int iDCPred0, iDCPred1, iDCPred2;
     int i, iQuant1, iQuant2, iQuant3, iErr;
     int iSkipMask, bSkipRow;
+    int iDMASize, iDMAOffset;
+    uint16_t *pAlignedPixels = pJPEG->usPixels;
     uint8_t c;
     int iMCUCount, xoff, iPitch, bThumbnail = 0;
     int bContinue = 1; // early exit if the DRAW callback wants to stop
@@ -4944,11 +4945,6 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     // Requested the Exif thumbnail
     if (pJPEG->ucMode == 0xc2) { // progressive mode - we only decode the first scan (DC values)
         pJPEG->iOptions |= JPEG_SCALE_EIGHTH; // return 1/8 sized image
-    }
-    if (pJPEG->iOptions & JPEG_LUMA_ONLY && pJPEG->ucNumComponents > 1) { // user wants grayscale output
-        if (pJPEG->ucPixelType < EIGHT_BIT_GRAYSCALE) {
-            pJPEG->ucPixelType = EIGHT_BIT_GRAYSCALE;
-        }
     }
     if (pJPEG->iOptions & JPEG_EXIF_THUMBNAIL)
     {
@@ -5047,12 +5043,17 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     if (pJPEG->ucPixelType == RGB8888) {
         iMCUCount /= 2; // half as many will fit
     }
+    iDMASize = iDMAOffset = 0; // assume no DMA scheme
     if (pJPEG->ucPixelType == EIGHT_BIT_GRAYSCALE)
         iMCUCount *= 2; // each pixel is only 1 byte
     if (iMCUCount > cx)
         iMCUCount = cx; // don't go wider than the image
-    if (iMCUCount > pJPEG->iMaxMCUs) // did the user set an upper bound on how many pixels per JPEGDraw callback?
+    if (iMCUCount > pJPEG->iMaxMCUs) { // did the user set an upper bound on how many pixels per JPEGDraw callback?
         iMCUCount = pJPEG->iMaxMCUs;
+    } else if (pJPEG->iOptions & JPEG_USES_DMA) { // user wants a ping-pong buffer scheme
+        iMCUCount /= 2; // divide the pixel buffer in half
+        iDMASize = MAX_BUFFERED_PIXELS / 2; // offset to the second half of the buffer
+    }
     if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) { // dithered, override the max MCU count
         iMCUCount = cx; // do the whole row
     }
@@ -5106,6 +5107,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         }
         for (x = 0; x < cx && bContinue && iErr == 0; x++)
         {
+            pJPEG->usPixels = &pAlignedPixels[iDMAOffset]; // make sure output is correct offset for DMA   
+
             iSkipMask = 0; // assume not skipping
             if (bSkipRow || x*mcuCX < pJPEG->iCropX || x*mcuCX > pJPEG->iCropX+pJPEG->iCropCX) {
                 iSkipMask = MCU_SKIP;
@@ -5288,7 +5291,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 if ((jd.y - pJPEG->iYOffset + mcuCY) > ((pJPEG->iHeight+iAdjust)>>iScaleShift)) { // last row needs to be trimmed
                    jd.iHeight = ((pJPEG->iHeight+iAdjust)>>iScaleShift) - (jd.y - pJPEG->iYOffset);
                 }
+                jd.pPixels = pJPEG->usPixels;
                 bContinue = (*pJPEG->pfnDraw)(&jd);
+                iDMAOffset ^= iDMASize; // toggle ping-pong offset
                 jd.x += iPitch;
                 if (pJPEG->iCropCX != (cx * mcuCX) && (iPitch + jd.x) > (pJPEG->iCropX + pJPEG->iCropCX)) { // image is cropped, don't go past end
                     iPitch = pJPEG->iCropCX - jd.x; // x=0 of output is really pJPEG->iCropx
