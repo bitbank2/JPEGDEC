@@ -22,7 +22,8 @@
 JPEGDEC jpg;
 int x1, y1, x2, y2;
 int iWidth, iHeight;
-
+uint16_t *pOldPixels;
+int bDMAFailed;
 //
 // Return the current time in microseconds
 //
@@ -48,6 +49,11 @@ void JPEGLOG(int line, char *string, const char *result)
 // Draw callback
 int JPEGDraw(JPEGDRAW *pDraw)
 {
+    if (pDraw->pPixels == pOldPixels) {
+        bDMAFailed = 1; // DMA option should toggle the buffer pointer with each callback
+    }
+    pOldPixels = pDraw->pPixels;
+    
     // record the max extents of the pixel positions
     if (pDraw->x < x1) x1 = pDraw->x;
     if (pDraw->y < y1) y1 = pDraw->y;
@@ -184,6 +190,20 @@ int main(int argc, const char * argv[]) {
     }
     JPEGLOG(__LINE__, szTestName, " - PASSED");
 
+    // Test 9 - confirm DMA option is properly providing a ping-pong buffer
+    bDMAFailed = 0;
+    pOldPixels = NULL;
+    szTestName = (char *)"JPEG DMA ping-pong buffer";
+    JPEGLOG(__LINE__, szTestName, szStart);
+    if (jpg.openFLASH((uint8_t *)tulips, sizeof(tulips), JPEGDraw)) {
+        jpg.decode(0,0,JPEG_USES_DMA);
+        jpg.close();
+    }
+    if (!bDMAFailed) {
+        JPEGLOG(__LINE__, szTestName, " - PASSED");
+    } else {
+        JPEGLOG(__LINE__, szTestName, " - FAILED");
+    }
     // FUZZ testing
     // Randomize the input data (file header and compressed data) and confirm that the library returns an error code
     // and doesn't have an invalid pointer exception
