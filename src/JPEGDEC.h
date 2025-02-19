@@ -13,7 +13,7 @@
 //
 #ifndef __JPEGDEC__
 #define __JPEGDEC__
-#if defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined( ESP_PLATFORM )
+#if defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined( ESP_PLATFORM ) || defined(_WIN64)
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -27,6 +27,12 @@
 #ifndef PROGMEM
 #define memcpy_P memcpy
 #define PROGMEM
+#endif
+#ifdef _M_X64 //MSVC
+#define __x86_64__
+#define __builtin_bswap16 _byteswap_ushort
+#define __builtin_bswap64 _byteswap_uint64
+#define __builtin_bswap32 _byteswap_ulong
 #endif
 // Cortex-M4/M7 allow unaligned access to SRAM
 #if defined(HAL_ESP32_HAL_H_) || defined(TEENSYDUINO) || defined(ARM_MATH_CM4) || defined(ARM_MATH_CM7) || defined (__x86_64__) || defined(TEENSYDUINO)
