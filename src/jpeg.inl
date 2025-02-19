@@ -66,7 +66,7 @@ static void JPEGGetMoreData(JPEGIMAGE *pPage);
 static int DecodeJPEG(JPEGIMAGE *pImage);
 static int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
 static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition);
-#if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO )
+#if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined(_WIN64)
 static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
 static int32_t seekFile(JPEGFILE *pFile, int32_t iPosition);
 static void closeFile(void *handle);
@@ -553,7 +553,7 @@ static const uint16_t usRangeTableB[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x00
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-#if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO )
+#if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined(_WIN64)
 //
 // API for C
 //
@@ -776,7 +776,7 @@ static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition)
     return iPosition;
 } /* seekMem() */
 
-#if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO )
+#if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined(_WIN64)
 
 static void closeFile(void *handle)
 {
