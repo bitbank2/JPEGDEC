@@ -272,7 +272,7 @@ int main(int argc, const char * argv[]) {
     for (i=0; i<2000; i++) { // corrupt each byte one at a time by inverting it
         memcpy(pFuzzData, tulips, sizeof(tulips)); // start with the valid data
         pFuzzData[i] = ~pFuzzData[i]; // invert the bits of this byte
-        if (jpg.openFLASH((uint8_t *)tulips, sizeof(tulips), JPEGDraw)) { // the JPEG header may be rejected
+        if (jpg.openFLASH(pFuzzData, sizeof(tulips), JPEGDraw)) { // the JPEG header may be rejected
             rc = jpg.decode(0,0,0);
             jpg.close();
         }
@@ -300,65 +300,6 @@ int main(int argc, const char * argv[]) {
     iTotalPass++;
     
     free(pFuzzData);
-#ifdef FUTURE
-    // Test 5
-    // Test that the performance of requesting a partial decode is not the same as a full decode
-    // In other words, see if asking for 1/2 of the image to be decoded takes about 1/2 the time
-    // of asking for the full image decode
-    //
-#define LOOP_COUNT 1000
-    iOldY = -1;
-    iLineCount = 0;
-    szTestName = (char *)"TIFF crop window perf test";
-    JPEGLOG(__LINE__, szTestName, szStart);
-    iTime1 = MilliTime(); // start time
-    for (int i=0; i<LOOP_COUNT; i++) { // needs to run many times on the Mac to measure a few milliseconds :)
-        if (g4.openTIFF((uint8_t *)weather_icons, (int)sizeof(weather_icons), TIFFDraw)) {
-            iHeight = g4.getHeight();
-            rc = g4.decode(); // decode the whole image
-            g4.close();
-            if (!(rc == TIFF_SUCCESS && iHeight == iLineCount)) {
-                JPEGLOG(__LINE__, szTestName, " - FAILED");
-                printf("iHeight = %d, lines = %d\n", iHeight, iLineCount);
-                i = LOOP_COUNT; // stop running
-            }
-        } else {
-            JPEGLOG(__LINE__, szTestName, " - open failed");
-            i = LOOP_COUNT; // stop running immediately
-        }
-    } // for i
-    iTime1 = MilliTime() - iTime1; // get the total time in milliseconds
-    // Now ask the library to decode only the top half of the image
-    iTime2 = MilliTime(); // start time 2
-    iOldY = -1;
-    iLineCount = 0;
-    for (i=0; i<LOOP_COUNT; i++) { // needs to run many times on the Mac to measure a few milliseconds :)
-        if (g4.openTIFF((uint8_t *)weather_icons, (int)sizeof(weather_icons), TIFFDraw)) {
-            iHeight = g4.getHeight();
-            g4.setDrawParameters(1.0f, TIFF_PIXEL_1BPP, 0, 0, g4.getWidth(), iHeight/2, NULL);
-            rc = g4.decode(); // decode the top half of the image
-            g4.close();
-            if (!(rc == TIFF_SUCCESS && iHeight/2 == iLineCount)) {
-                JPEGLOG(__LINE__, szTestName, " - FAILED");
-                printf("iHeight = %d, lines = %d\n", iHeight, iLineCount);
-                i = LOOP_COUNT; // stop running
-            }
-        } else {
-            JPEGLOG(__LINE__, szTestName, " - open failed");
-            i = LOOP_COUNT; // stop running immediately
-        }
-    } // for i
-    iTime2 = MilliTime() - iTime2; // get the total time in milliseconds for decoding 1/2 of the image
-    // The time may not be exactly half because of the time to parse the file header, but it should certainly be at least 25% less
-    i = (iTime1 * 3)/4;
-    if (iTime2 < i) {
-        JPEGLOG(__LINE__, szTestName, " - PASSED\n");
-        printf("Full decode time (%d iterations) = %d ms\n", LOOP_COUNT, iTime1);
-        printf("Top half decode time (%d iterations) = %d ms\n", LOOP_COUNT, iTime2);
-    } else {
-        JPEGLOG(__LINE__, szTestName, " - FAILED");
-    }
-#endif // FUTURE
     printf("Total tests: %d, %d passed, %d failed\n", iTotal, iTotalPass, iTotalFail);
     return 0;
 }
