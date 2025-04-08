@@ -41,7 +41,16 @@ int w, h, rc;
         jpeg->setPixelType(RGB565_BIG_ENDIAN);
         w = jpeg->getWidth();
         h = jpeg->getHeight();
-        if (x < 0 || w + x > pLCD->width() || y < 0 || y + h > pLCD->height()) {
+        if (x == JPEGDISPLAY_CENTER) {
+            x = (pLCD->width() - w)/2;
+            if (x < 0) x = 0;
+        } else if (x < 0 || w + x > pLCD->width()) {
+            return 0; // clipping not supported
+        }
+        if (y == JPEGDISPLAY_CENTER) {
+            y = (pLCD->height() - h)/2;
+            if (y < 0) y = 0;
+        } else if (y < 0 || y + h > pLCD->height()) {
         // clipping is not supported
             return 0;
         }
@@ -66,9 +75,18 @@ int JPEGDisplay::loadJPEG(BB_SPI_LCD *pLCD, int x, int y, const char *fname)
         jpeg->setPixelType(RGB565_BIG_ENDIAN);
         w = jpeg->getWidth();
         h = jpeg->getHeight();
-        if (x < 0 || w + x > pLCD->width() || y < 0 || y + h > pLCD->height()) {
-           // clipping is not supported
-           return 0;
+        if (x == JPEGDISPLAY_CENTER) {
+            x = (pLCD->width() - w)/2;
+            if (x < 0) x = 0;
+        } else if (x < 0 || w + x > pLCD->width()) {
+            return 0; // clipping not supported
+        }
+        if (y == JPEGDISPLAY_CENTER) {
+            y = (pLCD->height() - h)/2;
+            if (y < 0) y = 0;
+        } else if (y < 0 || y + h > pLCD->height()) {
+        // clipping is not supported
+            return 0;
         }
         jpeg->setUserPointer((void *)pLCD);
         jpeg->decode(x, y, 0); // simple decode, no options

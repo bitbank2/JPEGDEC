@@ -21,6 +21,10 @@
 #include <JPEGDEC.h>
 #include <bb_spi_lcd.h>
 
+// To center one or both coordinates for the drawing position
+//  use this constant value
+#define JPEGDISPLAY_CENTER -2
+
 class JPEGDisplay
 {
   public:

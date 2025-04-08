@@ -20,14 +20,19 @@ JPEGDisplay jd; // only one instance of this class is needed
 SPIClass SD_SPI;
 bool bSD = false;
 // These GPIOs are for the uSD card slot on the JC4827W543 "Cheap Yellow Display"
-#define SD_CS 10
-#define SD_MOSI 11
-#define SD_SCK 12
-#define SD_MISO 13
+//#define SD_CS 10
+//#define SD_MOSI 11
+//#define SD_SCK 12
+//#define SD_MISO 13
+// These GPIOs are for the uSD card slot on the Waveshare ESP32-S3 AMOLED 2.41"
+#define SD_CS 2
+#define SD_MOSI 5
+#define SD_SCK 4
+#define SD_MISO 6
 
 void setup() {
   int x, y, w, h, bpp;
-  lcd.begin(DISPLAY_CYD_543);
+  lcd.begin(DISPLAY_WS_AMOLED_241);
   lcd.fillScreen(TFT_BLACK);
   lcd.setTextColor(TFT_GREEN);
   lcd.setFont(FONT_12x16);
@@ -41,16 +46,9 @@ void setup() {
   }
 // Load a PNG from the uSD card
   if (bSD) {
-    // The PNG can be directly decoded to the LCD
-    if (jd.getJPEGInfo(&w, &h, &bpp, "/tulips_320x213.jpg")) { // get info
-        // center it on the LCD
-        x = (lcd.width() - w)/2;
-        y = (lcd.height() - h)/2;
-        if (x < 0) x = 0;
-        if (y < 0) y = 0;
-        jd.loadJPEG(&lcd, x, y, "/tulips_320x213.jpg"); // load this image from the root dir of the SD card
-        delay(5000);
-    }
+    // Instead of passing absolute x/y positioning, let the library center it
+      jd.loadJPEG(&lcd, JPEGDISPLAY_CENTER, JPEGDISPLAY_CENTER, "/tulips_320x213.jpg"); // load this image from the root dir of the SD card
+      delay(5000);
   }
   delay(3000);
   //
@@ -62,8 +60,8 @@ void setup() {
   lcd.fillScreen(TFT_BLACK);
   // You can request the dimensions and bit depth of the image BEFORE decoding it
   if (jd.getJPEGInfo(&w, &h, &bpp, octocat_small, sizeof(octocat_small))) {
-    sprite.createVirtual(w, h); // create a sprite of the PNG image size
-    // The PNG image can be decoded directly into the sprite instance
+    sprite.createVirtual(w, h); // create a sprite of the JPEG image size
+    // The JPEG image can be decoded directly into the sprite instance
     jd.loadJPEG(&sprite, 0, 0, octocat_small, sizeof(octocat_small));
     for (int y = 0; y < lcd.height(); y += h) { // now draw it all over the LCD
         for (int x = 0; x < lcd.width(); x += w) {
