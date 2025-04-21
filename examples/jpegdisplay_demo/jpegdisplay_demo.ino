@@ -17,26 +17,28 @@
 
 BB_SPI_LCD lcd, sprite; // one instance for the display and another for a 'sprite'
 JPEGDisplay jd; // only one instance of this class is needed
+#define USE_SDCARD
 SPIClass SD_SPI;
 bool bSD = false;
 // These GPIOs are for the uSD card slot on the JC4827W543 "Cheap Yellow Display"
-//#define SD_CS 10
-//#define SD_MOSI 11
-//#define SD_SCK 12
-//#define SD_MISO 13
+#define SD_CS 10
+#define SD_MOSI 11
+#define SD_SCK 12
+#define SD_MISO 13
 // These GPIOs are for the uSD card slot on the Waveshare ESP32-S3 AMOLED 2.41"
-#define SD_CS 2
-#define SD_MOSI 5
-#define SD_SCK 4
-#define SD_MISO 6
+//#define SD_CS 2
+//#define SD_MOSI 5
+//#define SD_SCK 4
+//#define SD_MISO 6
 
 void setup() {
   int x, y, w, h, bpp;
-  lcd.begin(DISPLAY_WS_AMOLED_241);
+  lcd.begin(DISPLAY_CYD_543);
   lcd.fillScreen(TFT_BLACK);
   lcd.setTextColor(TFT_GREEN);
   lcd.setFont(FONT_12x16);
-  
+
+#ifdef USE_SDCARD  
   SD_SPI.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
   if (!SD.begin(SD_CS, SD_SPI, 10000000)) { // Faster than 10MHz seems to fail on the CYDs
     lcd.println("Card Mount Failed");
@@ -44,13 +46,14 @@ void setup() {
     lcd.println("Card Mount Succeeded");
     bSD = true;
   }
-// Load a PNG from the uSD card
+// Load a JPEG from the uSD card
   if (bSD) {
     // Instead of passing absolute x/y positioning, let the library center it
       jd.loadJPEG(&lcd, JPEGDISPLAY_CENTER, JPEGDISPLAY_CENTER, "/tulips_320x213.jpg"); // load this image from the root dir of the SD card
       delay(5000);
   }
   delay(3000);
+#endif // USE_SDCARD
   //
   // Load and display the PNG image all over the display by using a 'sprite'
   // First, create a sprite instance of BB_SPI_LCD with the createVirtual() method
