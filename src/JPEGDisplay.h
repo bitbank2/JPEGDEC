@@ -44,24 +44,24 @@ BB_SPI_LCD *pLCD = (BB_SPI_LCD *)pDraw->pUser;
     return 1;
 } /* JPEGDraw() */
 
-// Functions to access a file on the SD card
-static File myfile;
-
-static void * myOpen(const char *filename, int32_t *size) {
-  myfile = SD.open(filename);
+static void * jpegOpen(const char *filename, int32_t *size) {
+  static File myfile = SD.open(filename);
   *size = myfile.size();
   return &myfile;
 }
-static void myClose(void *handle) {
-  if (myfile) myfile.close();
+static void jpegClose(void *handle) {
+  File *pFile = (File *)handle;
+  if (pFile) pFile->close();
 }
-static int32_t myRead(JPEGFILE *handle, uint8_t *buffer, int32_t length) {
-  if (!myfile) return 0;
-  return myfile.read(buffer, length);
+static int32_t jpegRead(JPEGFILE *handle, uint8_t *buffer, int32_t length) {
+  File *pFile = (File *)handle->fHandle;
+  if (!pFile) return 0;
+  return pFile->read(buffer, length);
 }
-static int32_t mySeek(JPEGFILE *handle, int32_t position) {
-  if (!myfile) return 0;
-  return myfile.seek(position);
+static int32_t jpegSeek(JPEGFILE *handle, int32_t position) {
+  File *pFile = (File *)handle->fHandle;
+  if (!pFile) return 0;
+  return pFile->seek(position);
 }
 
 int JPEGDisplay::loadJPEG(BB_SPI_LCD *pLCD, int x, int y, const void *pData, int iDataSize)
@@ -105,7 +105,7 @@ int JPEGDisplay::loadJPEG(BB_SPI_LCD *pLCD, int x, int y, const char *fname)
 
     jpeg = (JPEGDEC *)malloc(sizeof(JPEGDEC));
     if (!jpeg) return 0;
-    if (jpeg->open(fname, myOpen, myClose, myRead, mySeek, JPEGDraw)) {
+    if (jpeg->open(fname, jpegOpen, jpegClose, jpegRead, jpegSeek, JPEGDraw)) {
         jpeg->setPixelType(RGB565_BIG_ENDIAN);
         w = jpeg->getWidth();
         h = jpeg->getHeight();
@@ -160,7 +160,7 @@ int JPEGDisplay::getJPEGInfo(int *width, int *height, int *bpp, const char *fnam
     if (!width || !height || !bpp || !fname) return 0;
     jpeg = (JPEGDEC *)malloc(sizeof(JPEGDEC));
     if (!jpeg) return 0;
-    if (jpeg->open(fname, myOpen, myClose, myRead, mySeek, JPEGDraw)) {
+    if (jpeg->open(fname, jpegOpen, jpegClose, jpegRead, jpegSeek, JPEGDraw)) {
         *width = jpeg->getWidth();
         *height = jpeg->getHeight();
         *bpp = jpeg->getBpp();
