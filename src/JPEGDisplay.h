@@ -21,6 +21,8 @@
 #include <JPEGDEC.h>
 #include <bb_spi_lcd.h>
 #include <SD.h>
+#include "FS.h"
+#include <LittleFS.h>
 
 // To center one or both coordinates for the drawing position
 //  use this constant value
@@ -31,8 +33,10 @@ class JPEGDisplay
   public:
     int loadJPEG(BB_SPI_LCD *pLCD, int x, int y, const void *pData, int iDataSize);
     int loadJPEG(BB_SPI_LCD *pLCD, int x, int y, const char *fname);
+    int loadJPEG_LFS(BB_SPI_LCD *pLCD, int x, int y, const char *fname);
     int getJPEGInfo(int *width, int *height, int *bpp, const void *pData, int iDataSize);
     int getJPEGInfo(int *width, int *height, int *bpp, const char *fname);
+    int getJPEGInfo_LFS(int *width, int *height, int *bpp, const char *fname);
 };
 
 static int JPEGDraw(JPEGDRAW *pDraw)
@@ -49,6 +53,16 @@ static void * jpegOpen(const char *filename, int32_t *size) {
   *size = myfile.size();
   return &myfile;
 }
+static void * jpegOpenLFS(const char *filename, int32_t *size) {
+  static File myfile;
+  myfile = LittleFS.open(filename, FILE_READ);
+  if (myfile) {
+      *size = myfile.size();
+      return &myfile;
+  } else {
+     return NULL;
+  }
+}           
 static void jpegClose(void *handle) {
   File *pFile = (File *)handle;
   if (pFile) pFile->close();
@@ -132,6 +146,49 @@ int JPEGDisplay::loadJPEG(BB_SPI_LCD *pLCD, int x, int y, const char *fname)
     return 0;
 } /* loadJPEG() */
 
+int JPEGDisplay::loadJPEG_LFS(BB_SPI_LCD *pLCD, int x, int y, const char *fname)
+{
+    JPEGDEC *jpeg;
+    int w, h, rc;
+
+    if (!LittleFS.begin(false)) {
+        return 0;
+    }
+    jpeg = (JPEGDEC *)malloc(sizeof(JPEGDEC));
+    if (!jpeg) return 0;
+    if (jpeg->open(fname, jpegOpenLFS, jpegClose, jpegRead, jpegSeek, JPEGDraw)) {
+        jpeg->setPixelType(RGB565_BIG_ENDIAN);
+        w = jpeg->getWidth();
+        h = jpeg->getHeight();
+        if (x == JPEGDISPLAY_CENTER) {
+            x = (pLCD->width() - w)/2;
+            if (x < 0) x = 0;
+        } else if (x < 0 || w + x > pLCD->width()) {
+            jpeg->close();
+            free(jpeg);
+            return 0; // clipping not supported
+        }
+        if (y == JPEGDISPLAY_CENTER) {
+            y = (pLCD->height() - h)/2;
+            if (y < 0) y = 0;
+        } else if (y < 0 || y + h > pLCD->height()) {
+        // clipping is not supported
+            jpeg->close();
+            free(jpeg);
+            return 0;
+        }
+        jpeg->setUserPointer((void *)pLCD);
+        jpeg->decode(x, y, 0); // simple decode, no options
+        jpeg->close();
+        free(jpeg);
+        return 1;
+    } else {
+//        Serial.printf("jpeg->open failed with code: %d\n", jpeg->getLastError());
+    }
+    free(jpeg);
+    return 0;
+} /* loadJPEG_LFS() */
+
 int JPEGDisplay::getJPEGInfo(int *width, int *height, int *bpp, const void *pData, int iDataSize)
 {
     JPEGDEC *jpeg;
@@ -171,5 +228,28 @@ int JPEGDisplay::getJPEGInfo(int *width, int *height, int *bpp, const char *fnam
     free(jpeg);
     return 0;
 } /* getJPEGInfo() */
+
+int JPEGDisplay::getJPEGInfo_LFS(int *width, int *height, int *bpp, const char *fname)
+{
+    JPEGDEC *jpeg;
+    int rc;
+
+    if (!LittleFS.begin(false)) {
+        return 0;
+    }
+    if (!width || !height || !bpp || !fname) return 0;
+    jpeg = (JPEGDEC *)malloc(sizeof(JPEGDEC));
+    if (!jpeg) return 0;
+    if (jpeg->open(fname, jpegOpenLFS, jpegClose, jpegRead, jpegSeek, JPEGDraw)) {
+        *width = jpeg->getWidth();
+        *height = jpeg->getHeight();
+        *bpp = jpeg->getBpp();
+        jpeg->close();
+        free(jpeg);
+        return 1;
+    }
+    free(jpeg);
+    return 0;
+} /* getJPEGInfo_LFS() */
 
 #endif // __JPEGDISPLAY__

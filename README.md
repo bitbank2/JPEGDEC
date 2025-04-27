@@ -14,6 +14,7 @@ I started working with image and video files around 1989 and soon turned my inte
 
 Features:<br>
 ---------<br>
+- *New* JPEGDisplay helper class simplifies displaying images on LCDs supported by my bb_spi_lcd display library.
 - Supports any MCU with at least 20K of RAM (Cortex-M0+ is the simplest I've tested)
 - Optimized for speed; the main limitation will be how fast you can copy the pixels to the display. You can use DMA assisted SPI to help.
 - Includes built-in cropping function that's faster than JPEGTRAN.
