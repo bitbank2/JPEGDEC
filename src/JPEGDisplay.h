@@ -49,7 +49,8 @@ BB_SPI_LCD *pLCD = (BB_SPI_LCD *)pDraw->pUser;
 } /* JPEGDraw() */
 
 static void * jpegOpen(const char *filename, int32_t *size) {
-  static File myfile = SD.open(filename);
+  static File myfile;
+  myfile = SD.open(filename);
   *size = myfile.size();
   return &myfile;
 }
