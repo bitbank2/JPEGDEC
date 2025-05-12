@@ -9,7 +9,8 @@
 // currently support clipping, so attempts to draw off the edge of the display
 // will return with an error.
 //
-#include <JPEGDisplay.h>
+#include <JPEGDisplay.h>  // the definitions
+#include <JPEGDisplay.inl> // the code
 #include <bb_spi_lcd.h>
 #include <SPI.h>
 #include <SD.h>
