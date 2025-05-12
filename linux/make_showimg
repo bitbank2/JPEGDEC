@@ -1,0 +1,13 @@
+CFLAGS=-c -Wall -O2 -I../src -D__LINUX__
+LIBS = -lbb_spi_lcd -lgpiod -lm -lpthread
+
+all: showimg
+
+showimg: showimg.o
+	$(CC) showimg.o $(LIBS) -o showimg
+
+showimg.o: showimg.c ../src/JPEGDEC.h make_showimg
+	$(CC) $(CFLAGS) showimg.c
+
+clean:
+	rm *.o showimg
