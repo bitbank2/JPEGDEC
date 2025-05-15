@@ -792,6 +792,17 @@ static int32_t seekFile(JPEGFILE *pFile, int32_t iPosition)
     return iPosition;
 } /* seekFile() */
 
+static void * openFile(const char *szFilename, int32_t *pFileSize)
+{
+FILE *f;
+    f = fopen(szFilename, "r+b");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    *pFileSize = (int32_t)ftell(f);
+    fseek(f, 0, SEEK_SET);
+    return (void *)f;
+} /* openFile() */
+
 static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
     int32_t iBytesRead;
@@ -1174,7 +1185,7 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
             pBits = &pHuffVals[(iTable+4) * HUFF_TABLEN];
             p = pBits;
             p += 16; // point to bit data
-            if (iTable * HUFF11SIZE >= sizeof(pJPEG->usHuffAC) / 2)
+            if (iTable * HUFF11SIZE >= (int)sizeof(pJPEG->usHuffAC) / 2)
                 return 0;
             pShort = &pJPEG->usHuffAC[iTable*HUFF11SIZE];
             pLong = &pJPEG->usHuffAC[iTable*HUFF11SIZE + 1024];
@@ -2266,8 +2277,6 @@ mcu_done:
 static void JPEGIDCT(JPEGIMAGE *pJPEG, int iMCUOffset, int iQuantTable)
 {
     int iRow;
-    unsigned char ucColMask;
-    int iCol;
     signed int tmp6,tmp7,tmp10,tmp11,tmp12,tmp13;
     signed int z5,z10,z11,z12,z13;
     signed int tmp0,tmp1,tmp2,tmp3,tmp4,tmp5;
@@ -2543,7 +2552,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
 #if !defined (HAS_SSE) && !defined(HAS_NEON)
     // do columns first
     u16MCUFlags |= 1; // column 0 must always be calculated
-    for (iCol = 0; iCol < 8 && u16MCUFlags; iCol++)
+    for (int iCol = 0; iCol < 8 && u16MCUFlags; iCol++)
     {
         if (u16MCUFlags & (1<<iCol)) // column has data in it
         {
@@ -2754,7 +2763,7 @@ int16x8_t mmxZ5, mmxZ10, mmxZ11, mmxZ12, mmxZ13;
 #ifdef HAS_NEON
         {
             int16x4_t L_in_16x4, R_in_16x4, L_out, R_out;
-            int8x8_t LR_out_8x8;
+            uint8x8_t LR_out_8x8;
             int16x8_t LR_out;
             L_in_16x4 = vdup_n_s16(tmp0); // suppresses warning of setting lane 0 of uninitialized var
             L_in_16x4 = vset_lane_s16(tmp1, L_in_16x4, 1);

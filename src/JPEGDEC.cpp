@@ -151,6 +151,20 @@ int JPEGDEC::getJPEGType()
     return (_jpeg.ucMode == 0xc2) ? JPEG_MODE_PROGRESSIVE : JPEG_MODE_BASELINE;
 } /* getJPEGType() */
 
+#ifdef __LINUX__
+int JPEGDEC::open(const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw)
+{
+    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
+    _jpeg.pfnRead = readFile;
+    _jpeg.pfnClose = closeFile;
+    _jpeg.pfnSeek = seekFile;
+    _jpeg.pfnDraw = pfnDraw;
+    _jpeg.iMaxMCUs = 1000;
+    _jpeg.JPEGFile.fHandle = openFile(szFilename, &_jpeg.JPEGFile.iSize);
+    if (_jpeg.JPEGFile.fHandle == NULL) return 0;
+    return JPEGInit(&_jpeg);
+} /* open() */
+#endif // __LINUX__
 //
 // File (SD/MMC) based initialization
 //

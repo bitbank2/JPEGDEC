@@ -7,9 +7,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
-#include "JPEGDEC.h"
-#include "jpeg.inl"
-#include "../test_images/tulips.h"
+#include "../../../src/JPEGDEC.h"
+#include "../../../src/jpeg.inl"
+#include "../../../test_images/tulips.h"
 
 // Human readable error messages
 const char *szErrors[] = {"Success", "Invalid parameter", "Decode error", "Unsupported feature", "Invalid file"};
