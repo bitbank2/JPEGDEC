@@ -5074,7 +5074,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) { // dithered, override the max MCU count
         iMCUCount = cx; // do the whole row
     }
-    if (pJPEG->iCropCX != (cx * mcuCX)) { // crop enabled
+    if (pJPEG->iCropCX != pJPEG->iWidth /*(cx * mcuCX)*/) { // crop enabled
         if (iMCUCount * mcuCX > pJPEG->iCropCX) {
             iMCUCount = (pJPEG->iCropCX / mcuCX); // maximum width is the crop width
         }
@@ -5322,6 +5322,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 } else if ((cx - 1 - x) < iMCUCount) // change pitch for the last set of MCUs on this row
                     iPitch = (cx - 1 - x) * mcuCX;
                 xoff = 0;
+                if (iPitch & (mcuCX-1)) { // we don't clip the MCU drawing, so expand it
+                    iPitch = (iPitch + (mcuCX-1)) & ~(mcuCX-1);
+                }
             }
             if (pJPEG->iResInterval)
             {
