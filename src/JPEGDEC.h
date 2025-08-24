@@ -103,6 +103,8 @@ enum {
     RGB565_LITTLE_ENDIAN = 0,
     RGB565_BIG_ENDIAN,
     RGB8888,
+    RGB888,
+    BGR888,
     EIGHT_BIT_GRAYSCALE,
     FOUR_BIT_DITHERED,
     TWO_BIT_DITHERED,
@@ -156,6 +158,7 @@ typedef int32_t (JPEG_SEEK_CALLBACK)(JPEGFILE *pFile, int32_t iPosition);
 typedef int (JPEG_DRAW_CALLBACK)(JPEGDRAW *pDraw);
 typedef void * (JPEG_OPEN_CALLBACK)(const char *szFilename, int32_t *pFileSize);
 typedef void (JPEG_CLOSE_CALLBACK)(void *pHandle);
+typedef void (JPEG_MCU_CALLBACK)(void *pJPEGImage, int x, int iPitch);
 
 /* JPEG color component info */
 typedef struct _jpegcompinfo
@@ -222,6 +225,7 @@ typedef struct jpeg_image_tag
     JPEG_DRAW_CALLBACK *pfnDraw;
     JPEG_OPEN_CALLBACK *pfnOpen;
     JPEG_CLOSE_CALLBACK *pfnClose;
+    JPEG_MCU_CALLBACK *pfnMCU;
     JPEGCOMPINFO JPCI[MAX_COMPS_IN_SCAN]; /* Max color components */
     JPEGFILE JPEGFile;
     BUFFERED_BITS bb;
