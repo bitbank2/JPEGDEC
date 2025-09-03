@@ -5313,7 +5313,10 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 if ((jd.y - pJPEG->iYOffset + mcuCY) > iCurH) { // last row needs to be trimmed
                    jd.iHeight = iCurH - (jd.y - pJPEG->iYOffset);
                 }
-                jd.pPixels = pJPEG->usPixels;
+                if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE)
+                    jd.pPixels = (uint16_t *)pJPEG->pDitherBuffer; 
+                else
+                    jd.pPixels = pJPEG->usPixels;
                 bContinue = (*pJPEG->pfnDraw)(&jd);
                 iDMAOffset ^= iDMASize; // toggle ping-pong offset
                 jd.x += iPitch;
