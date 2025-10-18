@@ -3411,9 +3411,12 @@ static void JPEGPutMCU11(void *pji, int x, int iPitch)
     int iRow;
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
+    uint8_t *pRGB888 = NULL;
 
     if (pJPEG->ucPixelType == RGB8888) {
         pOutput += x; // 4 bytes per pixel, not 2
+    } else if (pJPEG->ucPixelType == RGB888) {
+        pRGB888 = (uint8_t *)pJPEG->usPixels + (x * 3); // 3 bytes per pixel
     }   
 
     pY  = (unsigned char *)&pJPEG->sMCUs[0*DCTSIZE];
@@ -3433,6 +3436,8 @@ static void JPEGPutMCU11(void *pji, int x, int iPitch)
                     JPEGPixelLE(pOutput+iCol, Y, iCb, iCr);
                 else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
                     JPEGPixelBE(pOutput+iCol, Y, iCb, iCr);
+                else if (pJPEG->ucPixelType == RGB888)
+                    JPEGPixelRGB(pRGB888 + iCol*3, Y, iCb, iCr);
                 else
                     JPEGPixelRGBX((uint32_t *)&pOutput[iCol*2], Y, iCb, iCr);
                 pCr += 2;
@@ -3442,7 +3447,13 @@ static void JPEGPutMCU11(void *pji, int x, int iPitch)
             pCr += 8;
             pCb += 8;
             pY += 8;
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            if (pJPEG->ucPixelType == RGB8888) {
+                pOutput += iPitch*2;
+            } else if (pJPEG->ucPixelType == RGB888) {
+                pRGB888 += iPitch*3;
+            } else {
+                pOutput += iPitch;
+            }
         } // for row
         return;
     }
@@ -3671,7 +3682,16 @@ static void JPEGPutMCU11(void *pji, int x, int iPitch)
                 JPEGPixelBE(pOutput+iCol, Y, iCb, iCr);
             } // for col
             pCr += delta; pCb += delta;
-        } else { // RGB888
+        } else if (pJPEG->ucPixelType == RGB888) { // RGB888
+            for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
+            {
+                iCr = *pCr++;
+                iCb = *pCb++;
+                Y = (int)(*pY++) << 12;
+                JPEGPixelRGB(pRGB888 + iCol*3, Y, iCb, iCr);
+            } // for col
+            pCr += delta; pCb += delta;
+        } else { // RGB8888
             for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
             {
                 iCr = *pCr++;
@@ -3681,7 +3701,13 @@ static void JPEGPutMCU11(void *pji, int x, int iPitch)
             } // for col
             pCr += delta; pCb += delta;
         }
-        pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+        if (pJPEG->ucPixelType == RGB8888) {
+            pOutput += iPitch*2;
+        } else if (pJPEG->ucPixelType == RGB888) {
+            pRGB888 += iPitch*3;
+        } else {
+            pOutput += iPitch;
+        }
     } // for row
 } /* JPEGPutMCU11() */
 
@@ -4068,7 +4094,10 @@ static void JPEGPutMCU22_RGB888(void *pji, int x, int iPitch)
     unsigned char *pY, *pCr, *pCb;
     int bUseOdd1, bUseOdd2; // special case where 24bpp odd sized image can clobber first column
     uint8_t *pOutput = (uint8_t *)pJPEG->usPixels;
-    pOutput += (x * 3);
+    int iPixelPitch = iPitch; // Save pixel width before converting to bytes
+    if (pJPEG->pFramebuffer == NULL) {
+        pOutput += (x * 3);  // Only add offset in non-framebuffer mode
+    }
     iPitch *= 3;
     pY  = (unsigned char *)&pJPEG->sMCUs[0*DCTSIZE];
     pCb = (unsigned char *)&pJPEG->sMCUs[4*DCTSIZE];
@@ -4077,17 +4106,18 @@ static void JPEGPutMCU22_RGB888(void *pji, int x, int iPitch)
     /* Convert YCC pixels into RGB pixels and store in output image */
     iYCount = 4;
     bUseOdd1 = bUseOdd2 = 1; // assume odd column can be used
-    if ((x+15) >= iPitch) {
-        iCol = (((iPitch & 15)+1) >> 1);
+    if ((x+15) >= iPixelPitch) { // Use pixel width for boundary check
+        int iRemaining = iPixelPitch - x;  // Remaining pixels
+        iCol = (iRemaining + 1) >> 1;  // Calculate remaining columns
         if (iCol >= 4) {
             iXCount1 = 4;
             iXCount2 = iCol-4;
-            if (iPitch & 1 && (iXCount2 * 2) + 8 + (x * 16) > iPitch)
+            if ((iPixelPitch - x) & 1)  // Check if odd number of pixels remain
                 bUseOdd2 = 0;
         } else {
             iXCount1 = iCol;
             iXCount2 = 0;
-            if (iPitch & 1 && (iXCount1 * 2) + (x * 16) > iPitch)
+            if ((iPixelPitch - x) & 1)  // Check if odd number of pixels remain
                 bUseOdd1 = 0;
         }
     } else {
@@ -4310,8 +4340,16 @@ static void JPEGPutMCU22(void *pji, int x, int iPitch)
     unsigned char *pY, *pCr, *pCb;
     int bUseOdd1, bUseOdd2; // special case where 24bpp odd sized image can clobber first column
     uint16_t *pOutput = &pJPEG->usPixels[x];
+    uint8_t *pRGB888 = NULL;
     if (pJPEG->ucPixelType == RGB8888) {
-        pOutput += x; // 4 bytes per pixel, not 2
+        if (pJPEG->pFramebuffer == NULL) {
+            pOutput += x; // 4 bytes per pixel, not 2
+        }
+    } else if (pJPEG->ucPixelType == RGB888) {
+        pRGB888 = (uint8_t *)pJPEG->usPixels;
+        if (pJPEG->pFramebuffer == NULL) {
+            pRGB888 += (x * 3); // 3 bytes per pixel
+        }
     }
     pY  = (unsigned char *)&pJPEG->sMCUs[0*DCTSIZE];
     pCb = (unsigned char *)&pJPEG->sMCUs[4*DCTSIZE];
@@ -4363,7 +4401,13 @@ static void JPEGPutMCU22(void *pji, int x, int iPitch)
             pY += 16;
             pCb += 8;
             pCr += 8;
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            if (pJPEG->ucPixelType == RGB8888) {
+                pOutput += iPitch*2;
+            } else if (pJPEG->ucPixelType == RGB888) {
+                pRGB888 += iPitch*3;
+            } else {
+                pOutput += iPitch;
+            }
         }
         return;
     }
@@ -4485,7 +4529,13 @@ static void JPEGPutMCU22(void *pji, int x, int iPitch)
                 } // for each column
             }
             pY += 2; // skip 1 line of source pixels
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            if (pJPEG->ucPixelType == RGB8888) {
+                pOutput += iPitch*2;
+            } else if (pJPEG->ucPixelType == RGB888) {
+                pRGB888 += iPitch*3;
+            } else {
+                pOutput += iPitch;
+            }
         }
         return;
     }
@@ -5292,9 +5342,12 @@ static void JPEGPutMCU12(void *pji, int x, int iPitch)
     int iRow, iCol, iXCount, iYCount;
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
+    uint8_t *pRGB888 = NULL;
     
     if (pJPEG->ucPixelType == RGB8888) {
         pOutput += x; // 4 bytes per pixel, not 2
+    } else if (pJPEG->ucPixelType == RGB888) {
+        pRGB888 = (uint8_t *)pJPEG->usPixels + (x * 3); // 3 bytes per pixel
     }   
 
     pY  = (uint8_t *)&pJPEG->sMCUs[0*DCTSIZE];
@@ -5323,7 +5376,13 @@ static void JPEGPutMCU12(void *pji, int x, int iPitch)
             pY += 8;
             if (iRow == 3) // skip to next Y MCU block
                pY += 64;
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            if (pJPEG->ucPixelType == RGB8888) {
+                pOutput += iPitch*2;
+            } else if (pJPEG->ucPixelType == RGB888) {
+                pRGB888 += iPitch*3;
+            } else {
+                pOutput += iPitch;
+            }
         }
         return;
     }
@@ -5469,9 +5528,12 @@ static void JPEGPutMCU21(void *pji, int x, int iPitch)
     int iRow;
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
+    uint8_t *pRGB888 = NULL;
 
     if (pJPEG->ucPixelType == RGB8888) {
         pOutput += x; // 4 bytes per pixel, not 2
+    } else if (pJPEG->ucPixelType == RGB888) {
+        pRGB888 = (uint8_t *)pJPEG->usPixels + (x * 3); // 3 bytes per pixel
     }   
 
     pY  = (uint8_t *)&pJPEG->sMCUs[0*DCTSIZE];
@@ -5510,7 +5572,13 @@ static void JPEGPutMCU21(void *pji, int x, int iPitch)
             pCb += 12;
             pCr += 12;
             pY += 8;
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            if (pJPEG->ucPixelType == RGB8888) {
+                pOutput += iPitch*2;
+            } else if (pJPEG->ucPixelType == RGB888) {
+                pRGB888 += iPitch*3;
+            } else {
+                pOutput += iPitch;
+            }
         }
         return;
     }
@@ -5896,22 +5964,32 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         jd.x = pJPEG->iXOffset;
         xoff = 0; // start of new LCD output group
         if (pJPEG->pFramebuffer) { // user-supplied buffer is full width
-            int ty = (y * mcuCY) - pJPEG->iCropY;
             iPitch = pJPEG->iCropCX; // size of cropped width
-            pJPEG->usPixels = (uint16_t *)pJPEG->pFramebuffer;
-            if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
-                pJPEG->usPixels += (ty * iPitch/2); // 1 byte per pixel
-            } else  if (pJPEG->ucPixelType == RGB8888) {
-                 pJPEG->usPixels += (ty * iPitch*2); // 4 bytes per pixel
-            } else { // 2 bytes per pixel
-                pJPEG->usPixels += (ty * iPitch);
-            }
         } else { // use our internal buffer to do it a block at a time
             iPitch = iMCUCount * mcuCX; // pixels per line of LCD buffer
         }
         for (x = 0; x < cx && bContinue && iErr == 0; x++)
         {
-            pJPEG->usPixels = &pAlignedPixels[iDMAOffset]; // make sure output is correct offset for DMA   
+            if (pJPEG->pFramebuffer == NULL) {
+                pJPEG->usPixels = &pAlignedPixels[iDMAOffset]; // make sure output is correct offset for DMA
+            } else {
+                // In framebuffer mode, adjust pointer for current MCU column
+                int ty = (y * mcuCY) - pJPEG->iCropY;
+                if (pJPEG->ucPixelType == RGB888) {
+                    uint8_t* pBytes = (uint8_t*)pJPEG->pFramebuffer;
+                    pBytes += (ty * iPitch * 3) + (x * mcuCX * 3);
+                    pJPEG->usPixels = (uint16_t *)pBytes;
+                } else if (pJPEG->ucPixelType == RGB8888) {
+                    pJPEG->usPixels = (uint16_t *)pJPEG->pFramebuffer;
+                    pJPEG->usPixels += (ty * iPitch*2) + (x * mcuCX * 2);
+                } else if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
+                    pJPEG->usPixels = (uint16_t *)pJPEG->pFramebuffer;
+                    pJPEG->usPixels += (ty * iPitch/2) + (x * mcuCX / 2);
+                } else { // 2 bytes per pixel (RGB565)
+                    pJPEG->usPixels = (uint16_t *)pJPEG->pFramebuffer;
+                    pJPEG->usPixels += (ty * iPitch) + (x * mcuCX);
+                }
+            }   
 
             iSkipMask = 0; // assume not skipping
             if (bSkipRow || x*mcuCX < pJPEG->iCropX || x*mcuCX > pJPEG->iCropX+pJPEG->iCropCX) {
@@ -6056,7 +6134,13 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 }
             } // if color components present
             if (!iSkipMask) { // this MCU is not skipped
-                (*pJPEG->pfnMCU)(pJPEG, xoff, iPitch); // draw the mcu
+                if (pJPEG->pFramebuffer) {
+                    // In framebuffer mode, usPixels already points to the correct position
+                    // But we still need to pass the x position for boundary checking
+                    (*pJPEG->pfnMCU)(pJPEG, x * mcuCX, iPitch);
+                } else {
+                    (*pJPEG->pfnMCU)(pJPEG, xoff, iPitch); // draw the mcu
+                }
                 xoff += mcuCX;
             } // if not skipped
             if (pJPEG->pFramebuffer == NULL && (xoff == iPitch || x == cx-1) && !iSkipMask) // time to draw

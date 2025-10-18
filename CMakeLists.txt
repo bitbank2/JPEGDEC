@@ -6,6 +6,6 @@ set(srcs
     "src/s3_simd_dequant.S"
 )
 idf_component_register(SRCS ${srcs}      
-                    REQUIRES "jpegdec" "esp-dsp"
+                    REQUIRES "esp-dsp"
                     INCLUDE_DIRS "src"
 )
