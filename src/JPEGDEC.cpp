@@ -271,3 +271,5 @@ int JPEGDEC::decodeDither(uint8_t *pDither, int iOptions)
     _jpeg.pDitherBuffer = pDither;
     return DecodeJPEG(&_jpeg);
 }
+
+JPEGDEC Jpeg;

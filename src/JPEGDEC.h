@@ -330,4 +330,6 @@ void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs);
 #define MOTOLONG(p) (((*p)<<24) + ((*(p+1))<<16) + ((*(p+2))<<8) + (*(p+3)))
 #endif // ALLOWS_UNALIGNED
 
+extern JPEGDEC Jpeg;
+
 #endif // __JPEGDEC__
