@@ -5124,7 +5124,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         }
         for (x = 0; x < cx && bContinue && iErr == 0; x++)
         {
-            pJPEG->usPixels = &pAlignedPixels[iDMAOffset]; // make sure output is correct offset for DMA   
+            if (pJPEG->pFramebuffer == NULL) {
+                pJPEG->usPixels = &pAlignedPixels[iDMAOffset]; // make sure output is correct offset for DMA   
+            }
 
             iSkipMask = 0; // assume not skipping
             if (bSkipRow || x*mcuCX < pJPEG->iCropX || x*mcuCX > pJPEG->iCropX+pJPEG->iCropCX) {
