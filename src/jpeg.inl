@@ -1578,12 +1578,12 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
     
     pPage->pFramebuffer = NULL; // this must be set AFTER calling this function
     // make sure usPixels is 16-byte aligned for S3 SIMD (and possibly others)
-    i = (int)(intptr_t)pPage->usUnalignedPixels;
+    i = (int)(int64_t)pPage->usUnalignedPixels;
     i &= 15;
     if (i == 0) i = 16; // already 16-byte aligned
     pPage->usPixels = &pPage->usUnalignedPixels[(16-i)>>1];
     // do the same for the MCU buffers
-    i = (int)(intptr_t)pPage->sUnalignedMCUs;
+    i = (int)(int64_t)pPage->sUnalignedMCUs;
     i &= 15;
     if (i == 0) i = 16;
     pPage->sMCUs = &pPage->sUnalignedMCUs[(16-i)>>1];
