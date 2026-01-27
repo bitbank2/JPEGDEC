@@ -1430,7 +1430,7 @@ static int JPEGGetSOS(JPEGIMAGE *pJPEG, int *iOff)
 static int JPEGFilter(uint8_t *pBuf, uint8_t *d, int iLen, uint8_t *bFF)
 {
 #ifdef HAS_SSE
-	__m128i xmmIn, xmmOut;
+	__m128i xmmIn = _mm_setzero_si128(), xmmOut;
         __m128i xmmFF = _mm_cmpeq_epi8(xmmIn, xmmIn);
 #endif // HAS_SSE
 #ifdef HAS_NEON
@@ -1578,12 +1578,12 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
     
     pPage->pFramebuffer = NULL; // this must be set AFTER calling this function
     // make sure usPixels is 16-byte aligned for S3 SIMD (and possibly others)
-    i = (int)(int64_t)pPage->usUnalignedPixels;
+    i = (int)(intptr_t)pPage->usUnalignedPixels;
     i &= 15;
     if (i == 0) i = 16; // already 16-byte aligned
     pPage->usPixels = &pPage->usUnalignedPixels[(16-i)>>1];
     // do the same for the MCU buffers
-    i = (int)(int64_t)pPage->sUnalignedMCUs;
+    i = (int)(intptr_t)pPage->sUnalignedMCUs;
     i &= 15;
     if (i == 0) i = 16;
     pPage->sMCUs = &pPage->sUnalignedMCUs[(16-i)>>1];
@@ -1839,7 +1839,7 @@ static int JPEGDecodeMCU_P(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
     }
 
     iPositive = (1 << pJPEG->cApproxBitsLow); // positive bit position being coded
-    iNegative = ((-1) << pJPEG->cApproxBitsLow); // negative bit position being coded
+    iNegative = (int32_t)((uint32_t)-1 << pJPEG->cApproxBitsLow); // negative bit position being coded
         
     if (pJPEG->iScanStart == 0)
     {
