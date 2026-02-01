@@ -1430,7 +1430,7 @@ static int JPEGGetSOS(JPEGIMAGE *pJPEG, int *iOff)
 static int JPEGFilter(uint8_t *pBuf, uint8_t *d, int iLen, uint8_t *bFF)
 {
 #ifdef HAS_SSE
-	__m128i xmmIn, xmmOut;
+	__m128i xmmIn = _mm_setzero_si128(), xmmOut;
         __m128i xmmFF = _mm_cmpeq_epi8(xmmIn, xmmIn);
 #endif // HAS_SSE
 #ifdef HAS_NEON
@@ -1839,7 +1839,7 @@ static int JPEGDecodeMCU_P(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
     }
 
     iPositive = (1 << pJPEG->cApproxBitsLow); // positive bit position being coded
-    iNegative = ((-1) << pJPEG->cApproxBitsLow); // negative bit position being coded
+    iNegative = (int32_t)((uint32_t)-1 << pJPEG->cApproxBitsLow); // negative bit position being coded
         
     if (pJPEG->iScanStart == 0)
     {
