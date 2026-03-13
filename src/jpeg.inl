@@ -1178,6 +1178,7 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
     }
     // now do AC components (up to 4 tables of 16-bit codes)
     // We split the codes into a short table (9 bits or less) and a long table (first 5 bits are 1)
+    if (pJPEG->ucMode == 0xc2) return 1; // don't calculate for progressive mode
     for (iTable = 0; iTable < 4; iTable++)
     {
         if (pJPEG->ucHuffTableUsed & (1 << (iTable+4)))  // if this table is defined
@@ -5131,7 +5132,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             }
 
             iSkipMask = 0; // assume not skipping
-            if (bSkipRow || x*mcuCX < pJPEG->iCropX || x*mcuCX > pJPEG->iCropX+pJPEG->iCropCX) {
+            if (pJPEG->ucMode != 0x52 && (bSkipRow || x*mcuCX < pJPEG->iCropX || x*mcuCX > pJPEG->iCropX+pJPEG->iCropCX)) {
                 iSkipMask = MCU_SKIP;
             }
             pJPEG->ucACTable = cACTable0;
