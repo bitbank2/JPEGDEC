@@ -3807,9 +3807,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_low_u8(u816YR), 4)); // widen and x16 to put on par with Cr/Cb values (right block)
           u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
           // ugly hack due to bug in GCC of vst4 intrinsics
-          u884Hack.val[0] = u88B;
+          u884Hack.val[0] = u88R;
           u884Hack.val[1] = u88G;
-          u884Hack.val[2] = u88R;
+          u884Hack.val[2] = u88B;
           u884Hack.val[3] = u88A;
           vst4_u8((uint8_t *)pOutput, u884Hack);
           // top right block
@@ -3826,9 +3826,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_high_u8(u816YL), 4)); // widen and x16 to put on par with Cr/Cb values (right block)
           u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
           // ugly hack due to bug in GCC of vst4 intrinsics
-          u884Hack.val[0] = u88B;
+          u884Hack.val[0] = u88R;
           u884Hack.val[1] = u88G;
-          u884Hack.val[2] = u88R;
+          u884Hack.val[2] = u88B;
           u884Hack.val[3] = u88A;
           vst4_u8((uint8_t *)(pOutput+16), u884Hack);
           // bottom left block
@@ -3845,9 +3845,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           i168Y = vreinterpretq_s16_u16(vshll_n_u8(vget_high_u8(u816YR), 4)); // widen and x16 to put on par with Cr/Cb values (bottom right block)
           u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
           // ugly hack due to bug in GCC of vst4 intrinsics
-          u884Hack.val[0] = u88B;
+          u884Hack.val[0] = u88R;
           u884Hack.val[1] = u88G;
-          u884Hack.val[2] = u88R;
+          u884Hack.val[2] = u88B;
           u884Hack.val[3] = u88A;
           vst4_u8((uint8_t *)(pOutput+iPitch*2), u884Hack);
           // bottom right block
@@ -3863,9 +3863,9 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           i168B = vaddq_s16(i168Y, i168Temp); // now we have 8 B values
           u88B = vqrshrun_n_s16(i168B, 4); // shift right, narrow and saturate to 8-bit unsigned
           // ugly hack due to bug in GCC of vst4 intrinsics
-          u884Hack.val[0] = u88B;
+          u884Hack.val[0] = u88R;
           u884Hack.val[1] = u88G;
-          u884Hack.val[2] = u88R;
+          u884Hack.val[2] = u88B;
           u884Hack.val[3] = u88A;
           vst4_u8((uint8_t *)(pOutput+iPitch*2+16), u884Hack);
           pCr += 8;
