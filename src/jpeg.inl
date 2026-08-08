@@ -5225,8 +5225,15 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
                     // We're not going to use the color channels, so avoid as much work as possible
                     if (pJPEG->ucMode == 0xc2) { // progressive
-                        iErr |= JPEGDecodeMCU_P(pJPEG, MCU_SKIP, &iDCPred1);
-                        iErr |= JPEGDecodeMCU_P(pJPEG, MCU_SKIP, &iDCPred2);
+                        // A progressive scan can contain luma without either chroma component.
+                        // Only consume entropy data for components present in this scan.
+                        if (pJPEG->JPCI[1].component_needed)
+                            iErr |= JPEGDecodeMCU_P(pJPEG, MCU_SKIP, &iDCPred1);
+                        if (pJPEG->JPCI[2].component_needed) {
+                            pJPEG->ucACTable = cACTable2;
+                            pJPEG->ucDCTable = cDCTable2;
+                            iErr |= JPEGDecodeMCU_P(pJPEG, MCU_SKIP, &iDCPred2);
+                        }
                     } else {
                         iErr |= JPEGDecodeMCU(pJPEG, MCU_SKIP, &iDCPred1); // decode Cr block
                         iErr |= JPEGDecodeMCU(pJPEG, MCU_SKIP, &iDCPred2); // decode Cb block
