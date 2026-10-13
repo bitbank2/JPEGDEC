@@ -1,4 +1,5 @@
 CFLAGS=-D__LINUX__ -Wall -O2
+PORTABLE_FLAGS=-DJPEGDEC_NO_ARDUINO -DNO_SIMD -Wall -Wextra -Werror -O2
 ASAN_FLAGS=-fsanitize=address -fno-omit-frame-pointer -O1 -g -Werror=vla
 LIBS=-lm -lpthread
 
@@ -31,7 +32,13 @@ JPEGDEC_asan.o: ../src/JPEGDEC.cpp ../src/JPEGDEC.h
 jpegdec_asan.o: ../src/jpegdec.c ../src/jpeg.inl ../src/JPEGDEC.h
 	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c ../src/jpegdec.c -o jpegdec_asan.o
 
-test: c_api_test cpp_api_test
+jpegdec_no_arduino.o: ../src/jpegdec.c ../src/jpeg.inl ../src/JPEGDEC.h
+	$(CC) $(PORTABLE_FLAGS) -c ../src/jpegdec.c -o jpegdec_no_arduino.o
+
+JPEGDEC_no_arduino.o: ../src/JPEGDEC.cpp ../src/JPEGDEC.h
+	$(CXX) $(PORTABLE_FLAGS) -c ../src/JPEGDEC.cpp -o JPEGDEC_no_arduino.o
+
+test: c_api_test cpp_api_test jpegdec_no_arduino.o JPEGDEC_no_arduino.o
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./c_api_test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./cpp_api_test
 
