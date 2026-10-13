@@ -24,10 +24,10 @@
 #include <FS.h>
 #endif
 #endif
-#ifndef memcpy_P
-#define memcpy_P memcpy
-#endif
 #ifndef PROGMEM
+// PROGMEM is an Arduino/AVR storage annotation meaning "keep this data in
+// program memory," usually flash, rather than consuming scarce SRAM. Define it
+// as empty on other architectures.
 #define PROGMEM
 #endif
 //
@@ -59,7 +59,7 @@
 #define JPEG_USES_DMA 128
 
 
-#if defined(__arm64__) || defined(__aarch64__) || defined (__x86_64__)
+#if defined(__arm64__) || defined(__aarch64__) || defined(__x86_64__) || defined(_M_X64)
 #define JPEGD_REGISTER_WIDTH 64
 typedef uint64_t jpegd_word_t;
 typedef int64_t jpegd_signed_word_t;

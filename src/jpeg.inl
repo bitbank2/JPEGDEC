@@ -22,6 +22,13 @@
 //
 #include "JPEGDEC.h"
 
+#if defined(JPEGDEC_NO_ARDUINO) || defined(__MACH__) || defined(__LINUX__) || \
+    defined(__MCUXPRESSO) || defined(ESP_PLATFORM) || defined(_WIN64)
+#ifndef memcpy_P
+#define memcpy_P memcpy
+#endif
+#endif
+
 #define JPEGD_FILE_HIGHWATER 1536
 #define JPEGD_HUFF_TABLE_LEN 273
 #define JPEGD_MCU_SKIP (-8)
