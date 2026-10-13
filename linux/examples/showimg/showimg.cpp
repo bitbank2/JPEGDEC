@@ -55,7 +55,7 @@ int main(int argc, const char *argv[])
 	lcd.drawStringFast("Linux JPEG Decoder Example", 0,0,FONT_12x16);
 	if (jpg.open(argv[1], JPEGDraw)) {
 		printf("Image opened: %dx%d\n", jpg.getWidth(), jpg.getHeight());
-                jpg.setPixelType(RGB565_BIG_ENDIAN);
+                jpg.setPixelType(JPEGD_PIXEL_RGB565_BE);
     		jpg.decode(0, 16, 0); // leave the first line of text showing
 	}
 	return 0;

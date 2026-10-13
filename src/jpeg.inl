@@ -762,7 +762,7 @@ void JPEG_setUserPointer(JPEGIMAGE *pJPEG, void *p)
 
 void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType)
 {
-    if (iType >= 0 && iType <= ONE_BIT_DITHERED)
+    if (iType >= 0 && iType <= JPEGD_PIXEL_ONE_BIT_DITHERED)
         pJPEG->ucPixelType = (uint8_t)iType;
     else
         pJPEG->iError = JPEG_INVALID_PARAMETER;
@@ -797,7 +797,7 @@ int JPEG_decodeYUV420P(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pCb,
     if (!JPEGValidateYUVOutput(pJPEG, pY, iYPitch, iCbPitch)) {
         return 0;
     }
-    pJPEG->ucPixelType = YUV420P;
+    pJPEG->ucPixelType = JPEGD_PIXEL_YUV420P;
     pJPEG->pY = pY;
     pJPEG->pCb = pCb;
     pJPEG->pCr = pCr;
@@ -822,7 +822,7 @@ int JPEG_decodeNV12(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pUV, in
     if (!JPEGValidateYUVOutput(pJPEG, pY, iYPitch, iChromaWidth)) {
         return 0;
     }
-    pJPEG->ucPixelType = NV12;
+    pJPEG->ucPixelType = JPEGD_PIXEL_NV12;
     pJPEG->pY = pY;
     pJPEG->pCb = pJPEG->pCr = NULL;
     pJPEG->pUV = pUV;
@@ -3215,7 +3215,7 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
         int pix;
         for (i=0; i<4; i++)
         {
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+            if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             {
                 for (j=0; j<4; j++)
                 {
@@ -3252,7 +3252,7 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
     }
     for (i=0; i<ycount; i++) // do up to 8 rows
     {
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
         {
             for (j=0; j<xcount; j++)
                 *usDest++ = usGrayTo565[*pSrc++];
@@ -3456,7 +3456,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
 
-    if (pJPEG->ucPixelType == RGB8888) {
+    if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
         pOutput += x; // 4 bytes per pixel, not 2
     }   
 
@@ -3473,9 +3473,9 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
                 iCr = (pCr[0] + pCr[1] + pCr[8] + pCr[9] + 2) >> 2;
                 iCb = (pCb[0] + pCb[1] + pCb[8] + pCb[9] + 2) >> 2;
                 Y = (pY[0] + pY[1] + pY[8] + pY[9]) << 10;
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                     JPEGPixelLE(pOutput+iCol, Y, iCb, iCr);
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                     JPEGPixelBE(pOutput+iCol, Y, iCb, iCr);
                 else
                     JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y, iCb, iCr);
@@ -3486,7 +3486,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
             pCr += 8;
             pCb += 8;
             pY += 8;
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            pOutput += (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) ? iPitch*2 : iPitch;
         } // for row
         return;
     }
@@ -3496,9 +3496,9 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
         iCr = pCr[0];
         iCb = pCb[0];
         Y = (int)(pY[0]) << 12;
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixelLE(pOutput, Y, iCb, iCr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixelBE(pOutput, Y, iCb, iCr);
         else
             JPEGPixelRGB((uint32_t *)pOutput, Y, iCb, iCr);
@@ -3507,7 +3507,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
     if (pJPEG->iOptions & JPEG_SCALE_QUARTER) // special case for 1/4 scaling
     {
         // only 4 pixels to draw, so no looping needed
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
         {
             iCr = *pCr++;
             iCb = *pCb++;
@@ -3526,7 +3526,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
             Y = (int)(*pY++) << 12;
             JPEGPixelLE(pOutput+1+iPitch, Y, iCb, iCr);
         }
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
         {
             iCr = *pCr++;
             iCb = *pCb++;
@@ -3544,7 +3544,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
             iCb = *pCb++;
             Y = (int)(*pY++) << 12;
             JPEGPixelBE(pOutput+1+iPitch, Y, iCb, iCr);
-        } else { // RGB8888
+        } else { // JPEGD_PIXEL_RGB8888
             iCr = *pCr++;
             iCb = *pCb++;
             Y = (int)(*pY++) << 12;
@@ -3567,7 +3567,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
 // full size
 #ifdef ESP32S3_SIMD
     if (x + 8 <= iPitch && (iPitch & 15) == 0) { // only for non-clipped MCUs
-        if (pJPEG->ucPixelType == RGB8888) iPitch *= 2;
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) iPitch *= 2;
         for (iRow=0; iRow<8; iRow++) {
             s3_ycbcr_convert_444(pY, pCb, pCr, pOutput, i16_Consts, pJPEG->ucPixelType);
             pCb += 8; pCr += 8; pY += 8; pOutput += iPitch;
@@ -3582,7 +3582,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
 // G = Y - 0.34414 * Cb + 0.28586 * Cr - Cr
 // B = Y - 0.22800 * Cb + Cb + Cb
 
- if (pJPEG->ucPixelType == RGB8888) {
+ if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
     __m128i mmxY, mmxCr, mmxCb, mmxTemp;
     __m128i mmxTemp2, mmxR, mmxG, mmxB;
         iPitch *= 2; // points to 32-bit values, not 16-bit
@@ -3694,7 +3694,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
     }
     for (iRow=0; iRow<8; iRow++) // up to 8 rows to do
     {
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
         {
             for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
             {
@@ -3705,7 +3705,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
             } // for col
             pCr += delta; pCb += delta;
         }
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
         {
             for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
             {
@@ -3725,7 +3725,7 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
             } // for col
             pCr += delta; pCb += delta;
         }
-        pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+        pOutput += (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) ? iPitch*2 : iPitch;
     } // for row
 } /* JPEGPutMCU11() */
 
@@ -3737,7 +3737,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
     unsigned char *pY, *pCr, *pCb;
     int bUseOdd1, bUseOdd2; // special case where 24bpp odd sized image can clobber first column
     uint16_t *pOutput = &pJPEG->usPixels[x];
-    if (pJPEG->ucPixelType == RGB8888) {
+    if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
         pOutput += x; // 4 bytes per pixel, not 2
     }
     pY  = (unsigned char *)&pJPEG->sMCUs[0*JPEGD_DCT_SIZE];
@@ -3753,36 +3753,36 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                 Y1 = (pY[iCol*2] + pY[iCol*2+1] + pY[iCol*2+8] + pY[iCol*2+9]) << 10;
                 Cb = pCb[iCol];
                 Cr = pCr[iCol];
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                     JPEGPixelLE(pOutput+iCol, Y1, Cb, Cr); // top left
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                     JPEGPixelBE(pOutput+iCol, Y1, Cb, Cr);
                 else
                     JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y1, Cb, Cr);
                 Y1 = (pY[iCol*2+(JPEGD_DCT_SIZE*2)] + pY[iCol*2+1+(JPEGD_DCT_SIZE*2)] + pY[iCol*2+8+(JPEGD_DCT_SIZE*2)] + pY[iCol*2+9+(JPEGD_DCT_SIZE*2)]) << 10;
                 Cb = pCb[iCol+4];
                 Cr = pCr[iCol+4];
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                     JPEGPixelLE(pOutput+iCol+4, Y1, Cb, Cr); // top right
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                     JPEGPixelBE(pOutput+iCol+4, Y1, Cb, Cr);
                 else
                     JPEGPixelRGB((uint32_t *)&pOutput[(iCol*2)+8], Y1, Cb, Cr);
                 Y1 = (pY[iCol*2+(JPEGD_DCT_SIZE*4)] + pY[iCol*2+1+(JPEGD_DCT_SIZE*4)] + pY[iCol*2+8+(JPEGD_DCT_SIZE*4)] + pY[iCol*2+9+(JPEGD_DCT_SIZE*4)]) << 10;
                 Cb = pCb[iCol+32];
                 Cr = pCr[iCol+32];
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                     JPEGPixelLE(pOutput+iCol+iPitch*4, Y1, Cb, Cr); // bottom left
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                     JPEGPixelBE(pOutput+iCol+iPitch*4, Y1, Cb, Cr);
                 else
                     JPEGPixelRGB((uint32_t *)&pOutput[(iCol+iPitch*4)*2], Y1, Cb, Cr);
                 Y1 = (pY[iCol*2+(JPEGD_DCT_SIZE*6)] + pY[iCol*2+1+(JPEGD_DCT_SIZE*6)] + pY[iCol*2+8+(JPEGD_DCT_SIZE*6)] + pY[iCol*2+9+(JPEGD_DCT_SIZE*6)]) << 10;
                 Cb = pCb[iCol+32+4];
                 Cr = pCr[iCol+32+4];
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                     JPEGPixelLE(pOutput+iCol+4+iPitch*4, Y1, Cb, Cr); // bottom right
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                     JPEGPixelBE(pOutput+iCol+4+iPitch*4, Y1, Cb, Cr);
                 else
                     JPEGPixelRGB((uint32_t *)&pOutput[(iCol+4+iPitch*4)*2], Y1, Cb, Cr);
@@ -3790,7 +3790,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
             pY += 16;
             pCb += 8;
             pCr += 8;
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            pOutput += (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) ? iPitch*2 : iPitch;
         }
         return;
     }
@@ -3799,33 +3799,33 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
         Y1 =  pY[0] << 12; // scale to level of conversion table
         Cb  = pCb[0];
         Cr  = pCr[0];
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixelLE(pOutput, Y1, Cb, Cr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixelBE(pOutput, Y1, Cb, Cr);
         else
             JPEGPixelRGB((uint32_t *)pOutput, Y1, Cb, Cr);
         // top right block
         Y1 =  pY[JPEGD_DCT_SIZE*2] << 12; // scale to level of conversion table
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixelLE(pOutput + 1, Y1, Cb, Cr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixelBE(pOutput + 1, Y1, Cb, Cr);
         else
             JPEGPixelRGB((uint32_t *)&pOutput[2], Y1, Cb, Cr);
         // bottom left block
         Y1 =  pY[JPEGD_DCT_SIZE*4] << 12;  // scale to level of conversion table
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixelLE(pOutput+iPitch, Y1, Cb, Cr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixelBE(pOutput+iPitch, Y1, Cb, Cr);
         else
             JPEGPixelRGB((uint32_t *)&pOutput[iPitch*2], Y1, Cb, Cr);
         // bottom right block
         Y1 =  pY[JPEGD_DCT_SIZE*6] << 12; // scale to level of conversion table
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixelLE(pOutput+ 1 + iPitch, Y1, Cb, Cr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixelBE(pOutput+ 1 + iPitch, Y1, Cb, Cr);
         else
             JPEGPixelRGB((uint32_t *)&pOutput[2 + iPitch*2], Y1, Cb, Cr);
@@ -3835,7 +3835,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
     {
         for (iRow=0; iRow<2; iRow++)
         {
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+            if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             {
                 for (iCol=0; iCol<2; iCol++)
                 {
@@ -3861,7 +3861,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelLE(pOutput+iPitch*2 + 2+iCol, Y1, Cb, Cr);
                 } // for each column
             }
-            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+            else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             {
                 for (iCol=0; iCol<2; iCol++)
                 {
@@ -3886,7 +3886,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     Cr  = pCr[3];
                     JPEGPixelBE(pOutput+iPitch*2 + 2+iCol, Y1, Cb, Cr);
                 } // for each column
-            } else { // RGB8888
+            } else { // JPEGD_PIXEL_RGB8888
                 for (iCol=0; iCol<2; iCol++)
                 {
                     // top left block
@@ -3912,14 +3912,14 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                 } // for each column
             }
             pY += 2; // skip 1 line of source pixels
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            pOutput += (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) ? iPitch*2 : iPitch;
         }
         return;
     }
 // full size
 #ifdef ESP32S3_SIMD
     if (x + 8 <= iPitch && (iPitch & 15) == 0) { // only for non-clipped MCUs
-        if (pJPEG->ucPixelType == RGB8888) iPitch *= 2;
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) iPitch *= 2;
         for (iRow=0; iRow<4; iRow++) { // top L+R, 4 pairs of lines x 16 pixels
             // each call converts 16 pixels
             s3_ycbcr_convert_420(pY, pCb, pCr, pOutput, i16_Consts, pJPEG->ucPixelType);
@@ -3938,7 +3938,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
 
 #ifdef HAS_NEON
     if (x+8 <= iPitch && (iPitch & 15) == 0) { // only for non-clipped MCUs
-    if (pJPEG->ucPixelType == RGB8888) {
+    if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
        int8x8_t i88Cr, i88Cb;
        uint8x16_t u816YL, u816YR;
        int16x8_t i168Cr, i168Cb, i168Y, i168Temp;
@@ -4090,7 +4090,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
-          if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes
+          if (ucPixelType == JPEGD_PIXEL_RGB565_BE) { // reverse the bytes
              u168Temp = vreinterpretq_u16_u8(vrev16q_u8(vreinterpretq_u8_u16(u168Temp))); 
           }
           vst1q_u16((uint16_t *)pOutput, u168Temp); // top left block
@@ -4112,7 +4112,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
-          if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes 
+          if (ucPixelType == JPEGD_PIXEL_RGB565_BE) { // reverse the bytes
              u168Temp = vreinterpretq_u16_u8(vrev16q_u8(vreinterpretq_u8_u16(u168Temp))); 
           }
           vst1q_u16((uint16_t *)(pOutput+8), u168Temp); // top right block
@@ -4134,7 +4134,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
-          if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes 
+          if (ucPixelType == JPEGD_PIXEL_RGB565_BE) { // reverse the bytes
               u168Temp = vreinterpretq_u16_u8(vrev16q_u8(vreinterpretq_u8_u16(u168Temp))); 
           }
           vst1q_u16((uint16_t *)(pOutput+iPitch), u168Temp); // bottom left block
@@ -4155,7 +4155,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 5); // shift green elements right and insert red elements
           u168Temp2 = vshll_n_u8(u88B, 8); // shift blue elements to top of 16-bit words
           u168Temp = vsriq_n_u16(u168Temp, u168Temp2, 11); // shift blue elements right and insert
-          if (ucPixelType == RGB565_BIG_ENDIAN) { // reverse the bytes 
+          if (ucPixelType == JPEGD_PIXEL_RGB565_BE) { // reverse the bytes
               u168Temp = vreinterpretq_u16_u8(vrev16q_u8(vreinterpretq_u8_u16(u168Temp)));
           }
           vst1q_u16((uint16_t *)(pOutput+iPitch+8), u168Temp); // bottom right block
@@ -4179,7 +4179,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
 // G = Y - 0.34414 * Cb + 0.28586 * Cr - Cr
 // B = Y - 0.22800 * Cb + Cb + Cb
 
- if (pJPEG->ucPixelType == RGB8888) {
+ if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
     __m128i mmxY, mmxCr, mmxCb, mmxTemp;
     __m128i mmxTemp2, mmxR, mmxG, mmxB;
     __m128i mmxConst1402, mmxConst0714, mmxConst0344, mmxConst1772;
@@ -4515,7 +4515,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
             Y4 <<= 12;
             Cb = pCb[iCol];
             Cr = pCr[iCol];
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+            if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             {
                 if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
                 {
@@ -4528,7 +4528,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelLE(pOutput+iPitch + (iCol<<1), Y3, Cb, Cr);
                 }
             }
-            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+            else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             {
                 if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
                 {
@@ -4540,7 +4540,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelBE(pOutput + (iCol<<1), Y1, Cb, Cr);
                     JPEGPixelBE(pOutput+iPitch + (iCol<<1), Y3, Cb, Cr);
                 }
-            } else { // RGB8888
+            } else { // JPEGD_PIXEL_RGB8888
                 if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
                 {
                     JPEGPixel2RGB((uint32_t *)&pOutput[iCol<<2], Y1, Y2, Cb, Cr);
@@ -4551,7 +4551,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelRGB((uint32_t *)&pOutput[iCol<<2], Y1, Cb, Cr);
                     JPEGPixelRGB((uint32_t *)&pOutput[(iPitch + (iCol<<1))*2], Y3, Cb, Cr);
                 }
-            } // RGB8888
+            } // JPEGD_PIXEL_RGB8888
             // for top right block
             if (iCol < iXCount2)
             {
@@ -4565,7 +4565,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                 Y4 <<= 12;
                 Cb = pCb[iCol+4];
                 Cr = pCr[iCol+4];
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                 {
                     if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
                     {
@@ -4578,7 +4578,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelLE(pOutput+iPitch+ 8+(iCol<<1), Y3, Cb, Cr);
                     }
                 }
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                 {
                     if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
                     {
@@ -4590,7 +4590,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelBE(pOutput+ 8+(iCol<<1), Y1, Cb, Cr);
                         JPEGPixelBE(pOutput+iPitch+ 8+(iCol<<1), Y3, Cb, Cr);
                     }
-                } else { // RGB8888
+                } else { // JPEGD_PIXEL_RGB8888
                     if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
                     {
                         JPEGPixel2RGB((uint32_t *)&pOutput[16+(iCol<<2)], Y1, Y2, Cb, Cr);
@@ -4601,7 +4601,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelRGB((uint32_t *)&pOutput[16+(iCol<<2)], Y1, Cb, Cr);
                         JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch+ 8+(iCol<<1))], Y3, Cb, Cr);
                     }
-                } // RGB8888
+                } // JPEGD_PIXEL_RGB8888
             }
             // for bottom left block
             Y1 = pY[iCol*2+JPEGD_DCT_SIZE*4];
@@ -4614,7 +4614,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
             Y4 <<= 12;
             Cb = pCb[iCol+32];
             Cr = pCr[iCol+32];
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+            if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             {
                 if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
                 {
@@ -4627,7 +4627,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelLE(pOutput+iPitch*9+ (iCol<<1), Y3, Cb, Cr);
                 }
             }
-            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+            else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             {
                 if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
                 {
@@ -4639,7 +4639,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelBE(pOutput+iPitch*8+ (iCol<<1), Y1, Cb, Cr);
                     JPEGPixelBE(pOutput+iPitch*9+ (iCol<<1), Y3, Cb, Cr);
                 }
-            } else { // RGB8888
+            } else { // JPEGD_PIXEL_RGB8888
                 if (bUseOdd1 || iCol != (iXCount1-1)) // only render if it won't go off the right edge
                 {
                     JPEGPixel2RGB((uint32_t *)&pOutput[2*(iPitch*8+ (iCol<<1))], Y1, Y2, Cb, Cr);
@@ -4650,7 +4650,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                     JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch*8+(iCol<<1))], Y1, Cb, Cr);
                     JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch*9+ (iCol<<1))], Y3, Cb, Cr);
                 }
-            } // RGB8888
+            } // JPEGD_PIXEL_RGB8888
             // for bottom right block
             if (iCol < iXCount2)
             {
@@ -4664,7 +4664,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                 Y4 <<= 12;
                 Cb = pCb[iCol+36];
                 Cr = pCr[iCol+36];
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                 {
                     if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
                     {
@@ -4677,7 +4677,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelLE(pOutput+iPitch*9+ 8+(iCol<<1), Y3, Cb, Cr);
                     }
                 }
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                 {
                     if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
                     {
@@ -4689,7 +4689,7 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelBE(pOutput+iPitch*8+ 8+(iCol<<1), Y1, Cb, Cr);
                         JPEGPixelBE(pOutput+iPitch*9+ 8+(iCol<<1), Y3, Cb, Cr);
                     }
-                } else { // RGB8888
+                } else { // JPEGD_PIXEL_RGB8888
                     if (bUseOdd2 || iCol != (iXCount2-1)) // only render if it won't go off the right edge
                     {
                         JPEGPixel2RGB((uint32_t *)&pOutput[2*(iPitch*8+ 8+(iCol<<1))], Y1, Y2, Cb, Cr);
@@ -4700,14 +4700,14 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
                         JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch*8+ 8+(iCol<<1))], Y1, Cb, Cr);
                         JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch*9+ 8+(iCol<<1))], Y3, Cb, Cr);
                     }
-                } // RGB8888
+                } // JPEGD_PIXEL_RGB8888
             }
         } // for each column
         pY += 16; // skip to next line of source pixels
         pCb += 8;
         pCr += 8;
         pOutput += iPitch*2;
-        if (pJPEG->ucPixelType == RGB8888) {
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
             pOutput += iPitch*2;
         }
     }
@@ -4721,7 +4721,7 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
     
-    if (pJPEG->ucPixelType == RGB8888) {
+    if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
         pOutput += x; // 4 bytes per pixel, not 2
     }   
 
@@ -4738,9 +4738,9 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
                 Y1 = (pY[0] + pY[1] + pY[8] + pY[9]) << 10;
                 Cb = (pCb[0] + pCb[1] + 1) >> 1;
                 Cr = (pCr[0] + pCr[1] + 1) >> 1;
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                     JPEGPixelLE(pOutput+iCol, Y1, Cb, Cr);
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                     JPEGPixelBE(pOutput+iCol, Y1, Cb, Cr);
                 else
                     JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y1, Cb, Cr);
@@ -4751,7 +4751,7 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
             pY += 8;
             if (iRow == 3) // skip to next Y MCU block
                pY += 64;
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            pOutput += (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) ? iPitch*2 : iPitch;
         }
         return;
     }
@@ -4761,17 +4761,17 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
         Y2 = pY[JPEGD_DCT_SIZE*2] << 12;
         Cb = pCb[0];
         Cr = pCr[0];
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
         {
             JPEGPixelLE(pOutput, Y1, Cb, Cr);
             JPEGPixelLE(pOutput + iPitch, Y2, Cb, Cr);
         }
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
         {
             JPEGPixelBE(pOutput, Y1, Cb, Cr);
             JPEGPixelBE(pOutput + iPitch, Y2, Cb, Cr);
         }
-        else { // RGB8888
+        else { // JPEGD_PIXEL_RGB8888
             JPEGPixelRGB((uint32_t *)pOutput, Y1, Cb, Cr);
             JPEGPixelRGB((uint32_t *)&pOutput[iPitch*2], Y2, Cb, Cr);
         }
@@ -4783,16 +4783,16 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
         Y2 = pY[2] << 12;
         Cb = pCb[0];
         Cr = pCr[0];
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
         {
             JPEGPixelLE(pOutput, Y1, Cb, Cr);
             JPEGPixelLE(pOutput + iPitch, Y2, Cb, Cr);
         }
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
         {
             JPEGPixelBE(pOutput, Y1, Cb, Cr);
             JPEGPixelBE(pOutput + iPitch, Y2, Cb, Cr);
-        } else { // RGB8888
+        } else { // JPEGD_PIXEL_RGB8888
             JPEGPixelRGB((uint32_t *)&pOutput, Y1, Cb, Cr);
             JPEGPixelRGB((uint32_t *)&pOutput[iPitch*2], Y2, Cb, Cr);
         }
@@ -4800,16 +4800,16 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
         Y2 = pY[3] << 12;
         Cb = pCb[1];
         Cr = pCr[1];
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
         {
             JPEGPixelLE(pOutput + 1, Y1, Cb, Cr);
             JPEGPixelLE(pOutput + 1 + iPitch, Y2, Cb, Cr);
         }
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
         {
             JPEGPixelBE(pOutput + 1, Y1, Cb, Cr);
             JPEGPixelBE(pOutput + 1 + iPitch, Y2, Cb, Cr);
-        } else { // RGB8888
+        } else { // JPEGD_PIXEL_RGB8888
             JPEGPixelRGB((uint32_t *)&pOutput[2], Y1, Cb, Cr);
             JPEGPixelRGB((uint32_t *)&pOutput[(1 + iPitch)*2], Y2, Cb, Cr);
         }
@@ -4818,16 +4818,16 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
         Y2 = pY[2] << 12;
         Cb = pCb[2];
         Cr = pCr[2];
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
         {
             JPEGPixelLE(pOutput + iPitch*2, Y1, Cb, Cr);
             JPEGPixelLE(pOutput + iPitch*3, Y2, Cb, Cr);
         }
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
         {
             JPEGPixelBE(pOutput + iPitch*2, Y1, Cb, Cr);
             JPEGPixelBE(pOutput + iPitch*3, Y2, Cb, Cr);
-        } else { // RGB8888
+        } else { // JPEGD_PIXEL_RGB8888
             JPEGPixelRGB((uint32_t *)&pOutput[iPitch*4], Y1, Cb, Cr);
             JPEGPixelRGB((uint32_t *)&pOutput[iPitch*6], Y2, Cb, Cr);
         }
@@ -4835,17 +4835,17 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
         Y2 = pY[3] << 12;
         Cb = pCb[3];
         Cr = pCr[3];
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
         {
             JPEGPixelLE(pOutput + 1 + iPitch*2, Y1, Cb, Cr);
             JPEGPixelLE(pOutput + 1 + iPitch*3, Y2, Cb, Cr);
         }
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
         {
             JPEGPixelBE(pOutput + 1 + iPitch*2, Y1, Cb, Cr);
             JPEGPixelBE(pOutput + 1 + iPitch*3, Y2, Cb, Cr);
         }
-        else { // RGB8888
+        else { // JPEGD_PIXEL_RGB8888
             JPEGPixelRGB((uint32_t *)&pOutput[2 + iPitch*4], Y1, Cb, Cr);
             JPEGPixelRGB((uint32_t *)&pOutput[2 + iPitch*6], Y2, Cb, Cr);
         }
@@ -4865,26 +4865,26 @@ static void JPEGPutMCU12(JPEGIMAGE *pJPEG, int x, int iPitch)
             Y2 <<= 12;
             Cb = pCb[iCol];
             Cr = pCr[iCol];
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+            if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             {
                 JPEGPixelLE(pOutput + iCol, Y1, Cb, Cr);
                 JPEGPixelLE(pOutput + iPitch + iCol, Y2, Cb, Cr);
             }
-            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+            else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             {
                 JPEGPixelBE(pOutput + iCol, Y1, Cb, Cr);
                 JPEGPixelBE(pOutput + iPitch + iCol, Y2, Cb, Cr);
-            } else { // RGB8888
+            } else { // JPEGD_PIXEL_RGB8888
                 JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y1, Cb, Cr);
                 JPEGPixelRGB((uint32_t *)&pOutput[2*(iPitch + iCol)], Y2, Cb, Cr);
-            } // RGB8888
+            } // JPEGD_PIXEL_RGB8888
         }
         pY += 16; // skip to next 2 lines of source pixels
         if (iRow == 6) // next MCU block, skip ahead to correct spot
             pY += (128-64);
         pCb += 8;
         pCr += 8;
-        pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*4 : iPitch*2; // next 2 lines of dest pixels
+        pOutput += (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) ? iPitch*4 : iPitch*2; // next 2 lines of dest pixels
     }
 } /* JPEGPutMCU12() */
 
@@ -4897,7 +4897,7 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
     uint8_t *pY, *pCr, *pCb;
     uint16_t *pOutput = &pJPEG->usPixels[x];
 
-    if (pJPEG->ucPixelType == RGB8888) {
+    if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
         pOutput += x; // 4 bytes per pixel, not 2
     }   
 
@@ -4914,9 +4914,9 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
                 iCr = (pCr[0] + pCr[8] + 1) >> 1;
                 iCb = (pCb[0] + pCb[8] + 1) >> 1;
                 Y1 = (signed int)(pY[0] + pY[1] + pY[8] + pY[9]) << 10;
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                     JPEGPixelLE(pOutput+iCol, Y1, iCb, iCr);
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                     JPEGPixelBE(pOutput+iCol, Y1, iCb, iCr);
                 else
                     JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y1, iCb, iCr);
@@ -4924,9 +4924,9 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
                 iCr = (pCr[4] + pCr[12] + 1) >> 1;
                 iCb = (pCb[4] + pCb[12] + 1) >> 1;
                 Y1 = (signed int)(pY[128] + pY[129] + pY[136] + pY[137]) << 10;
-                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                     JPEGPixelLE(pOutput+iCol+4, Y1, iCb, iCr);
-                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                     JPEGPixelBE(pOutput+iCol+4, Y1, iCb, iCr);
                 else
                     JPEGPixelRGB((uint32_t *)&pOutput[(iCol+4)*2], Y1, iCb, iCr);
@@ -4937,7 +4937,7 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
             pCb += 12;
             pCr += 12;
             pY += 8;
-            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+            pOutput += (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) ? iPitch*2 : iPitch;
         }
         return;
     }
@@ -4947,9 +4947,9 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
         iCb = pCb[0];
         Y1 = (signed int)(pY[0]) << 12;
         Y2 = (signed int)(pY[JPEGD_DCT_SIZE*2]) << 12;
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixel2LE(pOutput, Y1, Y2, iCb, iCr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixel2BE(pOutput, Y1, Y2, iCb, iCr);
         else
             JPEGPixel2RGB((uint32_t *)pOutput, Y1, Y2, iCb, iCr);
@@ -4962,9 +4962,9 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
         iCb = pCb[0];
         Y1 = (signed int)(pY[0]) << 12;
         Y2 = (signed int)(pY[1]) << 12;
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixel2LE(pOutput, Y1, Y2, iCb, iCr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixel2BE(pOutput, Y1, Y2, iCb, iCr);
         else
             JPEGPixel2RGB((uint32_t *)pOutput, Y1, Y2, iCb, iCr);
@@ -4973,9 +4973,9 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
         iCb = pCb[1];
         Y1 = (signed int)pY[JPEGD_DCT_SIZE*2] << 12;
         Y2 = (signed int)pY[JPEGD_DCT_SIZE*2+1] << 12;
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixel2LE(pOutput + 2, Y1, Y2, iCb, iCr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixel2BE(pOutput + 2, Y1, Y2, iCb, iCr);
         else
             JPEGPixel2RGB((uint32_t *)&pOutput[4], Y1, Y2, iCb, iCr);
@@ -4984,9 +4984,9 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
         iCb = pCb[2];
         Y1 = (signed int)(pY[2]) << 12;
         Y2 = (signed int)(pY[3]) << 12;
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixel2LE(pOutput + iPitch, Y1, Y2, iCb, iCr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixel2BE(pOutput + iPitch, Y1, Y2, iCb, iCr);
         else
             JPEGPixel2RGB((uint32_t *)&pOutput[iPitch*2], Y1, Y2, iCb, iCr);
@@ -4995,9 +4995,9 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
         iCb = pCb[3];
         Y1 = (signed int)pY[JPEGD_DCT_SIZE*2+2] << 12;
         Y2 = (signed int)pY[JPEGD_DCT_SIZE*2+3] << 12;
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+        if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
             JPEGPixel2LE(pOutput + iPitch + 2, Y1, Y2, iCb, iCr);
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+        else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
             JPEGPixel2BE(pOutput + iPitch + 2, Y1, Y2, iCb, iCr);
         else
             JPEGPixel2RGB((uint32_t *)&pOutput[(iPitch+2)*2], Y1, Y2, iCb, iCr);
@@ -5013,27 +5013,27 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
             iCb = *pCb++;
             Y1 = (signed int)(*pY++) << 12;
             Y2 = (signed int)(*pY++) << 12;
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+            if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                 JPEGPixel2LE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
-            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+            else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                 JPEGPixel2BE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
-            else // RGB8888
+            else // JPEGD_PIXEL_RGB8888
                 JPEGPixel2RGB((uint32_t *)&pOutput[iCol*4], Y1, Y2, iCb, iCr);
             // right block
             iCr = pCr[3];
             iCb = pCb[3];
             Y1 = (signed int)pY[126] << 12;
             Y2 = (signed int)pY[127] << 12;
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+            if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_LE)
                 JPEGPixel2LE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
-            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+            else if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
                 JPEGPixel2BE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
-            else // RGB8888
+            else // JPEGD_PIXEL_RGB8888
                 JPEGPixel2RGB((uint32_t *)&pOutput[16 + iCol*4], Y1, Y2, iCb, iCr);
         } // for col
         pCb += 4;
         pCr += 4;
-        pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+        pOutput += (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) ? iPitch*2 : iPitch;
     } // for row
 } /* JPEGPutMCU21() */
 
@@ -5053,19 +5053,19 @@ uint8_t pixelmask=0, shift=0;
     pDest = pSrc = pJPEG->pDitherBuffer; // write the new pixels over the original
     switch (ucPixelType)
     {
-        case FOUR_BIT_DITHERED:
+        case JPEGD_PIXEL_FOUR_BIT_DITHERED:
             iDestPitch = (iWidth+1)/2;
             pixelmask = 0xf0;
             shift = 4;
             xmask = 1;
             break;
-        case TWO_BIT_DITHERED:
+        case JPEGD_PIXEL_TWO_BIT_DITHERED:
             iDestPitch = (iWidth+3)/4;
             pixelmask = 0xc0;
             shift = 2;
             xmask = 3;
             break;
-        case ONE_BIT_DITHERED:
+        case JPEGD_PIXEL_ONE_BIT_DITHERED:
             iDestPitch = (iWidth+7)/8;
             pixelmask = 0x80;
             shift = 1;
@@ -5202,7 +5202,7 @@ static void JPEGPutMCUYUV420(JPEGIMAGE *pJPEG, int x, int y, int mcuCX, int mcuC
                                 JPEGGetMCUChroma(pJPEG, pMCUCb, sx0, sy1) +
                                 JPEGGetMCUChroma(pJPEG, pMCUCb, sx1, sy1) + 2) >> 2);
             }
-            if (pJPEG->ucPixelType == YUV420P) {
+            if (pJPEG->ucPixelType == JPEGD_PIXEL_YUV420P) {
                 pJPEG->pCb[((y>>1)+i)*pJPEG->iCbPitch+(x>>1)+j] = cb;
                 pJPEG->pCr[((y>>1)+i)*pJPEG->iCrPitch+(x>>1)+j] = cr;
             } else {
@@ -5264,8 +5264,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         iMaxFill = 1;
         bThumbnail = 1;
     }
-    if (pJPEG->iOptions & JPEG_LUMA_ONLY && pJPEG->ucPixelType < EIGHT_BIT_GRAYSCALE) {
-        pJPEG->ucPixelType = EIGHT_BIT_GRAYSCALE; // switch to grayscale output
+    if (pJPEG->iOptions & JPEG_LUMA_ONLY && pJPEG->ucPixelType < JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE) {
+        pJPEG->ucPixelType = JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE; // switch to grayscale output
     }
     // reorder and fix the quantization table for decoding
     JPEGFixQuantD(pJPEG);
@@ -5336,11 +5336,11 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     pJPEG->iResCount = pJPEG->iResInterval;
     // Calculate how many MCUs we can fit in the pixel buffer to maximize LCD drawing speed
     iMCUCount = JPEGD_MAX_BUFFERED_PIXELS / (mcuCX * mcuCY);
-    if (pJPEG->ucPixelType == RGB8888) {
+    if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
         iMCUCount /= 2; // half as many will fit
     }
     iDMASize = iDMAOffset = 0; // assume no DMA scheme
-    if (pJPEG->ucPixelType == EIGHT_BIT_GRAYSCALE)
+    if (pJPEG->ucPixelType == JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE)
         iMCUCount *= 2; // each pixel is only 1 byte
     if (iMCUCount > cx)
         iMCUCount = cx; // don't go wider than the image
@@ -5350,7 +5350,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
         iMCUCount /= 2; // divide the pixel buffer in half
         iDMASize = JPEGD_MAX_BUFFERED_PIXELS / 2; // offset to the second half of the buffer
     }
-    if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) { // dithered, override the max MCU count
+    if (pJPEG->ucPixelType > JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE) { // dithered, override the max MCU count
         iMCUCount = cx; // do the whole row
     }
     if (pJPEG->iCropCX != pJPEG->iWidth /*(cx * mcuCX)*/) { // crop enabled
@@ -5361,23 +5361,23 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     jd.iBpp = 16;
     switch (pJPEG->ucPixelType)
     {
-        case RGB8888:
+        case JPEGD_PIXEL_RGB8888:
             jd.iBpp = 32;
             break;
-        case EIGHT_BIT_GRAYSCALE:
+        case JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE:
             jd.iBpp = 8;
             break;
-        case FOUR_BIT_DITHERED:
+        case JPEGD_PIXEL_FOUR_BIT_DITHERED:
             jd.iBpp = 4;
             break;
-        case TWO_BIT_DITHERED:
+        case JPEGD_PIXEL_TWO_BIT_DITHERED:
             jd.iBpp = 2;
             break;
-        case ONE_BIT_DITHERED:
+        case JPEGD_PIXEL_ONE_BIT_DITHERED:
             jd.iBpp = 1;
             break;
     }
-    if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE)
+    if (pJPEG->ucPixelType > JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE)
         jd.pPixels = (uint16_t *)pJPEG->pDitherBuffer;
     else
         jd.pPixels = pJPEG->usPixels;
@@ -5391,9 +5391,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
             int ty = (y * mcuCY) - pJPEG->iCropY;
             iPitch = pJPEG->iCropCX; // size of cropped width
             pJPEG->usPixels = (uint16_t *)pJPEG->pFramebuffer;
-            if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
+            if (pJPEG->ucPixelType >= JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE) {
                 pJPEG->usPixels += (ty * iPitch/2); // 1 byte per pixel
-            } else  if (pJPEG->ucPixelType == RGB8888) {
+            } else  if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB8888) {
                  pJPEG->usPixels += (ty * iPitch*2); // 4 bytes per pixel
             } else { // 2 bytes per pixel
                 pJPEG->usPixels += (ty * iPitch);
@@ -5498,7 +5498,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 // first chroma
                 pJPEG->ucACTable = cACTable1;
                 pJPEG->ucDCTable = cDCTable1;
-                if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE && pJPEG->ucPixelType < YUV420P) {
+                if (pJPEG->ucPixelType >= JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE && pJPEG->ucPixelType < JPEGD_PIXEL_YUV420P) {
                     // We're not going to use the color channels, so avoid as much work as possible
                     if (pJPEG->ucMode == 0xc2) { // progressive
                         iErr |= JPEGDecodeMCU_P(pJPEG, JPEGD_MCU_SKIP, &iDCPred1);
@@ -5550,9 +5550,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 }
             } // if color components present
             if (!iSkipMask) { // this MCU is not skipped
-                if (pJPEG->ucPixelType == YUV420P || pJPEG->ucPixelType == NV12) {
+                if (pJPEG->ucPixelType == JPEGD_PIXEL_YUV420P || pJPEG->ucPixelType == JPEGD_PIXEL_NV12) {
                     JPEGPutMCUYUV420(pJPEG, x*mcuCX, y*mcuCY, mcuCX, mcuCY);
-                } else if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
+                } else if (pJPEG->ucPixelType >= JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE) {
                     JPEGPutMCU8BitGray(pJPEG, xoff, iPitch); // grayscale or color is being drawn as grayscale
                 } else {
                     switch (pJPEG->ucSubSample) {
@@ -5575,8 +5575,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 } // normal MCU drawing
                 xoff += mcuCX;
             } // if not skipped
-            if (pJPEG->pFramebuffer == NULL && pJPEG->ucPixelType != YUV420P &&
-                pJPEG->ucPixelType != NV12 && (xoff == iPitch || x == cx-1) && !iSkipMask) // time to draw
+            if (pJPEG->pFramebuffer == NULL && pJPEG->ucPixelType != JPEGD_PIXEL_YUV420P &&
+                pJPEG->ucPixelType != JPEGD_PIXEL_NV12 && (xoff == iPitch || x == cx-1) && !iSkipMask) // time to draw
             {
                 int iAdjust;
                 int iCurW, iCurH;
@@ -5585,7 +5585,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 iCurH = (pJPEG->iHeight + iAdjust) >> iScaleShift;
                 jd.iWidth = jd.iWidthUsed = iPitch; // width of each LCD block group
                 jd.pUser = pJPEG->pUser;
-                if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE) { // dither to 4/2/1 bits
+                if (pJPEG->ucPixelType > JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE) { // dither to 4/2/1 bits
                     JPEGDither(pJPEG, cx * mcuCX, mcuCY);
                 }
                 if (((jd.x - pJPEG->iXOffset) + iPitch) > iCurW) { // right edge has clipped pixels
@@ -5597,7 +5597,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 if ((jd.y - pJPEG->iYOffset + mcuCY) > iCurH) { // last row needs to be trimmed
                    jd.iHeight = iCurH - (jd.y - pJPEG->iYOffset);
                 }
-                if (pJPEG->ucPixelType > EIGHT_BIT_GRAYSCALE)
+                if (pJPEG->ucPixelType > JPEGD_PIXEL_EIGHT_BIT_GRAYSCALE)
                     jd.pPixels = (uint16_t *)pJPEG->pDitherBuffer; 
                 else
                     jd.pPixels = pJPEG->usPixels;

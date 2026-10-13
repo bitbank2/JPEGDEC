@@ -39,8 +39,8 @@ int main(void)
         return 1;
     }
 
-    jpeg.setPixelType(RGB565_LITTLE_ENDIAN);
-    if (jpeg.getPixelType() != RGB565_LITTLE_ENDIAN) {
+    jpeg.setPixelType(JPEGD_PIXEL_RGB565_LE);
+    if (jpeg.getPixelType() != JPEGD_PIXEL_RGB565_LE) {
         fprintf(stderr, "unexpected pixel type\n");
         return 1;
     }

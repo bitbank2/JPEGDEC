@@ -72,7 +72,7 @@ void DisplayFile(void)
 {
   int options = 0, xoff, yoff, w, h;
   if (jpg.openRAM(pBuffer, iFileSize, JPEGDraw)) { // pass the data and its size
-      jpg.setPixelType(RGB565_BIG_ENDIAN); // bb_spi_lcd uses big-endian RGB565 pixels
+      jpg.setPixelType(JPEGD_PIXEL_RGB565_BE); // bb_spi_lcd uses big-endian RGB565 pixels
       // if the image is smaller than the LCD dimensions, center it
       w = iWidth = jpg.getWidth();
       h = iHeight = jpg.getHeight();

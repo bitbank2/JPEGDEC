@@ -63,7 +63,7 @@ int iXOff, iYOff; // used for centering the image
     Serial.println("Successfully opened JPEG image");
     Serial.printf("Image size: %d x %d, orientation: %d, bpp %d, sub %02x\n", jpeg.getWidth(),
       jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp(), jpeg.getSubSample());
-    jpeg.setPixelType(RGB565_BIG_ENDIAN); // The LCD wants the 16-bit pixels in big-endian order
+    jpeg.setPixelType(JPEGD_PIXEL_RGB565_BE); // The LCD wants the 16-bit pixels in big-endian order
     // center the image on the display
     iXOff = (lcd.width() - jpeg.getWidth())/2;
     if (iXOff < 0) iXOff = 0;
@@ -88,7 +88,7 @@ int iXOff, iYOff; // used for centering the image
   lcd.println("JPEG Crop Example");
   lcd.println("Cropped image decode:");
   if (jpeg.openFLASH((uint8_t *)croptest, sizeof(croptest), drawMCUs)) {
-    jpeg.setPixelType(RGB565_BIG_ENDIAN); // The LCD wants the 16-bit pixels in big-endian order
+    jpeg.setPixelType(JPEGD_PIXEL_RGB565_BE); // The LCD wants the 16-bit pixels in big-endian order
     jpeg.setCropArea(120, 65, 119, 110); // requested area
     lcd.printf("Requested: (120,65,119,110)\n");
     jpeg.getCropArea(&x, &y, &cx, &cy);

@@ -71,7 +71,7 @@ int w, h, rc;
         return 0;
     }
     if (jpeg->openRAM((uint8_t *)pData, iDataSize, JPEGDraw)) {
-        jpeg->setPixelType(RGB565_BIG_ENDIAN);
+        jpeg->setPixelType(JPEGD_PIXEL_RGB565_BE);
         w = jpeg->getWidth();
         h = jpeg->getHeight();
         if (x == JPEGDISPLAY_CENTER) {
@@ -114,7 +114,7 @@ int JPEGDisplay::loadJPEG(BB_SPI_LCD *pLCD, int x, int y, const char *fname, int
         return 0;
     }
     if (jpeg->open(fname, jpegOpen, jpegClose, jpegRead, jpegSeek, JPEGDraw)) {
-        jpeg->setPixelType(RGB565_BIG_ENDIAN);
+        jpeg->setPixelType(JPEGD_PIXEL_RGB565_BE);
         w = jpeg->getWidth();
         h = jpeg->getHeight();
         if (x == JPEGDISPLAY_CENTER) {
@@ -160,7 +160,7 @@ int JPEGDisplay::loadJPEG_LFS(BB_SPI_LCD *pLCD, int x, int y, const char *fname,
         return 0;
     }
     if (jpeg->open(fname, jpegOpenLFS, jpegClose, jpegRead, jpegSeek, JPEGDraw)) {
-        jpeg->setPixelType(RGB565_BIG_ENDIAN);
+        jpeg->setPixelType(JPEGD_PIXEL_RGB565_BE);
         w = jpeg->getWidth();
         h = jpeg->getHeight();
         if (x == JPEGDISPLAY_CENTER) {

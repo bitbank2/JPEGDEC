@@ -30,7 +30,7 @@ int JPEGDraw(JPEGDRAW *pDraw)
 {
   int y, iPitch, shift;
   uint8_t *s, *d, *pBuffer = epaper.currentBuffer();
-  if (jpg.getPixelType() == ONE_BIT_DITHERED) {
+  if (jpg.getPixelType() == JPEGD_PIXEL_ONE_BIT_DITHERED) {
     shift = 3;
   } else {
     shift = 1;
@@ -69,7 +69,7 @@ void setup()
   epaper.print("1-bit Floyd Steinberg Dither");
   if (jpg.openFLASH((uint8_t *)tulips, sizeof(tulips), JPEGDraw)) {
     // 1-bit dithered can fit in the existing JPEGIMAGE structure
-      jpg.setPixelType(ONE_BIT_DITHERED); // request 1-bit dithered output
+      jpg.setPixelType(JPEGD_PIXEL_ONE_BIT_DITHERED); // request 1-bit dithered output
       w = jpg.getWidth();
       h = jpg.getHeight();
       // We need to allocate extra memory to do dithering because it needs the full
@@ -92,7 +92,7 @@ void setup()
   // Decode the same image again
   if (jpg.openFLASH((uint8_t *)tulips, sizeof(tulips), JPEGDraw)) {
     // 1-bit dithered can fit in the existing JPEGIMAGE structure
-      jpg.setPixelType(FOUR_BIT_DITHERED); // request 4-bit dithered output
+      jpg.setPixelType(JPEGD_PIXEL_FOUR_BIT_DITHERED); // request 4-bit dithered output
       w = jpg.getWidth();
       h = jpg.getHeight();
       // We need to allocate extra memory to do dithering because it needs the full

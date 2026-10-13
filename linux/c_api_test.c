@@ -40,8 +40,8 @@ int main(void)
         return 1;
     }
 
-    JPEG_setPixelType(&jpeg, RGB565_LITTLE_ENDIAN);
-    if (JPEG_getPixelType(&jpeg) != RGB565_LITTLE_ENDIAN) {
+    JPEG_setPixelType(&jpeg, JPEGD_PIXEL_RGB565_LE);
+    if (JPEG_getPixelType(&jpeg) != JPEGD_PIXEL_RGB565_LE) {
         fprintf(stderr, "unexpected pixel type\n");
         return 1;
     }

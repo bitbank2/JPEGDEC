@@ -76,7 +76,7 @@ char szTemp[64];
       jpeg.getHeight(), jpeg.getOrientation(), jpeg.getBpp());
     if (jpeg.hasThumb())
        Serial.printf("Thumbnail present: %d x %d\n", jpeg.getThumbWidth(), jpeg.getThumbHeight());
-    jpeg.setPixelType(RGB565_BIG_ENDIAN); // The SPI LCD wants the 16-bit pixels in big-endian order
+    jpeg.setPixelType(JPEGD_PIXEL_RGB565_BE); // The SPI LCD wants the 16-bit pixels in big-endian order
     lTime = micros();
     // Draw the thumbnail image in the middle of the display (upper left corner = 120,100) at 1/4 scale
     if (jpeg.decode(120,100,JPEG_SCALE_QUARTER | JPEG_EXIF_THUMBNAIL))

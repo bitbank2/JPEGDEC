@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
     	printf("Error opening %s = %d\n", argv[1], jpg.getLastError());
     	return -1;
     }
-    jpg.setPixelType(RGB565_LITTLE_ENDIAN);
+    jpg.setPixelType(JPEGD_PIXEL_RGB565_LE);
     w = jpg.getWidth(); h = jpg.getHeight();
     if (jpg.getJPEGType() == JPEG_MODE_PROGRESSIVE) {
         // N.B. Progressive mode only supports decoding the first 'scan'

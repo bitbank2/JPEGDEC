@@ -39,7 +39,7 @@ JPEGIMAGE jpg;
 uint8_t *pFrame;
 int iDestPitch;
 //uint8_t ucDitherBuffer[1024 * 16];
-int ucPixelType = RGB565_BIG_ENDIAN; // default output used for SPI LCDs
+int ucPixelType = JPEGD_PIXEL_RGB565_BE; // default output used for SPI LCDs
 
 //
 // Minimal code to save frames as Windows BMP files
@@ -160,7 +160,7 @@ int ConvertFileTest(char *argv[], int iFraction)
        iOption = 0; // full size
     }
 
-    ucPixelType = RGB565_LITTLE_ENDIAN; //RGB8888; // generate 32-bit pixels for a Windows BMP file
+    ucPixelType = JPEGD_PIXEL_RGB565_LE; //JPEGD_PIXEL_RGB8888; // generate 32-bit pixels for a Windows BMP file
     rc = JPEG_openFile(&jpg, argv[1], NULL);
     if (!rc) {
         printf("Error opening file %s\n", argv[1]);
@@ -169,7 +169,7 @@ int ConvertFileTest(char *argv[], int iFraction)
     cx = jpg.iWidth / iFraction;
     cy = jpg.iHeight / iFraction;
     //cx = (cx + 7) & 0xfff8; // align on at least 16-byte boundary
-    if (ucPixelType == RGB8888) {
+    if (ucPixelType == JPEGD_PIXEL_RGB8888) {
         iDestPitch = (cx * 4); // 32-bits per pixel
         bpp = 32;
     } else {

@@ -64,7 +64,7 @@ void setup()
   lcd.println("Decode + center on LCD");
   bDMA = false;
   if (jpg.openFLASH((uint8_t *)zebra, sizeof(zebra), JPEGDraw)) { // pass the data and its size
-      jpg.setPixelType(RGB565_BIG_ENDIAN); // bb_spi_lcd uses big-endian RGB565 pixels
+      jpg.setPixelType(JPEGD_PIXEL_RGB565_BE); // bb_spi_lcd uses big-endian RGB565 pixels
       // if the image is smaller than the LCD dimensions, center it
       xoff = (lcd.width() - jpg.getWidth())/2;
       yoff = (lcd.height() - jpg.getHeight())/2;
@@ -77,7 +77,7 @@ void setup()
   }
   bDMA = true;
   if (jpg.openFLASH((uint8_t *)zebra, sizeof(zebra), JPEGDraw)) { // pass the data and its size
-      jpg.setPixelType(RGB565_BIG_ENDIAN); // bb_spi_lcd uses big-endian RGB565 pixels
+      jpg.setPixelType(JPEGD_PIXEL_RGB565_BE); // bb_spi_lcd uses big-endian RGB565 pixels
       // if the image is smaller than the LCD dimensions, center it
       xoff = (lcd.width() - jpg.getWidth())/2;
       yoff = (lcd.height() - jpg.getHeight())/2;
