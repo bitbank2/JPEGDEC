@@ -1,5 +1,6 @@
 set(srcs 
     "src/JPEGDEC.cpp"
+    "src/jpegdec.c"
     "src/jpeg.inl"
     "src/s3_simd_420.S"
     "src/s3_simd_444.S"

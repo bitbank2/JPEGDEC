@@ -22,18 +22,7 @@
 //
 #include "JPEGDEC.h"
 
-// forward references
-JPEG_STATIC int JPEGInit(JPEGIMAGE *pJPEG);
-JPEG_STATIC int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb);
-JPEG_STATIC void JPEGGetMoreData(JPEGIMAGE *pPage);
-JPEG_STATIC int DecodeJPEG(JPEGIMAGE *pImage);
-JPEG_STATIC void JPEG_setFramebuffer(JPEGIMAGE *pPage, void *pFramebuffer);
-void JPEG_setCropArea(JPEGIMAGE *pJPEG, int x, int y, int w, int h);
-void JPEG_getCropArea(JPEGIMAGE *pJPEG, int *x, int *y, int *w, int *h);
-void JPEG_setFramebuffer(JPEGIMAGE *pJPEG, void *pFramebuffer);
-
-// Include the C code which does the actual work
-#include "jpeg.inl"
+// The portable C code is compiled separately from jpegdec.c
 
 void JPEGDEC::setFramebuffer(void *pFramebuffer)
 {
@@ -42,98 +31,73 @@ void JPEGDEC::setFramebuffer(void *pFramebuffer)
 
 int JPEGDEC::getPixelType()
 {
-    return (int)_jpeg.ucPixelType;
+    return JPEG_getPixelType(&_jpeg);
 }
 void JPEGDEC::setPixelType(int iType)
 {
-    if (iType >= 0 && iType < INVALID_PIXEL_TYPE)
-        _jpeg.ucPixelType = (uint8_t)iType;
-    else
-        _jpeg.iError = JPEG_INVALID_PARAMETER;
+    JPEG_setPixelType(&_jpeg, iType);
 } /* setPixelType() */
 
 void JPEGDEC::setMaxOutputSize(int iMaxMCUs)
 {
-    if (iMaxMCUs < 1)
-        iMaxMCUs = 1; // don't allow invalid value
-    _jpeg.iMaxMCUs = iMaxMCUs;
+    JPEG_setMaxOutputSize(&_jpeg, iMaxMCUs);
 } /* setMaxOutputSize() */
 //
 // Memory initialization
 //
 int JPEGDEC::openRAM(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
-    _jpeg.ucMemType = JPEG_MEM_RAM;
-    _jpeg.pfnRead = readRAM;
-    _jpeg.pfnSeek = seekMem;
-    _jpeg.pfnDraw = pfnDraw;
-    _jpeg.pfnOpen = NULL;
-    _jpeg.pfnClose = NULL;
-    _jpeg.JPEGFile.iSize = iDataSize;
-    _jpeg.JPEGFile.pData = pData;
-    _jpeg.iMaxMCUs = 1000; // set to an unnaturally high value to start
-    return JPEGInit(&_jpeg);
+    return JPEG_openRAM(&_jpeg, pData, iDataSize, pfnDraw);
 } /* openRAM() */
 
 int JPEGDEC::openFLASH(const uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
-    _jpeg.ucMemType = JPEG_MEM_FLASH;
-    _jpeg.pfnRead = readFLASH;
-    _jpeg.pfnSeek = seekMem;
-    _jpeg.pfnDraw = pfnDraw;
-    _jpeg.pfnOpen = NULL;
-    _jpeg.pfnClose = NULL;
-    _jpeg.JPEGFile.iSize = iDataSize;
-    _jpeg.JPEGFile.pData = (uint8_t *)pData;
-    _jpeg.iMaxMCUs = 1000; // set to an unnaturally high value to start
-    return JPEGInit(&_jpeg);
+    return JPEG_openFLASH(&_jpeg, pData, iDataSize, pfnDraw);
 } /* openFLASH() */
 
 int JPEGDEC::getOrientation()
 {
-    return (int)_jpeg.ucOrientation;
+    return JPEG_getOrientation(&_jpeg);
 } /* getOrientation() */
 
 int JPEGDEC::getLastError()
 {
-    return _jpeg.iError;
+    return JPEG_getLastError(&_jpeg);
 } /* getLastError() */
 
 int JPEGDEC::getWidth()
 {
-    return _jpeg.iWidth;
+    return JPEG_getWidth(&_jpeg);
 } /* getWidth() */
 
 int JPEGDEC::getHeight()
 {
-    return _jpeg.iHeight;
+    return JPEG_getHeight(&_jpeg);
 } /* getHeight() */
 
 int JPEGDEC::hasThumb()
 {
-    return (int)_jpeg.ucHasThumb;
+    return JPEG_hasThumb(&_jpeg);
 } /* hasThumb() */
 
 int JPEGDEC::getThumbWidth()
 {
-    return _jpeg.iThumbWidth;
+    return JPEG_getThumbWidth(&_jpeg);
 } /* getThumbWidth() */
 
 int JPEGDEC::getThumbHeight()
 {
-    return _jpeg.iThumbHeight;
+    return JPEG_getThumbHeight(&_jpeg);
 } /* getThumbHeight() */
 
 int JPEGDEC::getBpp()
 {
-    return (int)_jpeg.ucBpp;
+    return JPEG_getBpp(&_jpeg);
 } /* getBpp() */
 
 int JPEGDEC::getSubSample()
 {
-    return (int)_jpeg.ucSubSample;
+    return JPEG_getSubSample(&_jpeg);
 } /* getSubSample() */
 
 void JPEGDEC::setCropArea(int x, int y, int w, int h)
@@ -148,21 +112,13 @@ void JPEGDEC::getCropArea(int *x, int *y, int *w, int *h)
 
 int JPEGDEC::getJPEGType()
 {
-    return (_jpeg.ucMode == 0xc2) ? JPEG_MODE_PROGRESSIVE : JPEG_MODE_BASELINE;
+    return JPEG_getJPEGType(&_jpeg);
 } /* getJPEGType() */
 
 #ifdef __LINUX__
 int JPEGDEC::open(const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
-    _jpeg.pfnRead = readFile;
-    _jpeg.pfnClose = closeFile;
-    _jpeg.pfnSeek = seekFile;
-    _jpeg.pfnDraw = pfnDraw;
-    _jpeg.iMaxMCUs = 1000;
-    _jpeg.JPEGFile.fHandle = openFile(szFilename, &_jpeg.JPEGFile.iSize);
-    if (_jpeg.JPEGFile.fHandle == NULL) return 0;
-    return JPEGInit(&_jpeg);
+    return JPEG_openFile(&_jpeg, szFilename, pfnDraw);
 } /* open() */
 #endif // __LINUX__
 //
@@ -170,17 +126,7 @@ int JPEGDEC::open(const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw)
 //
 int JPEGDEC::open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
-    _jpeg.pfnRead = pfnRead;
-    _jpeg.pfnSeek = pfnSeek;
-    _jpeg.pfnDraw = pfnDraw;
-    _jpeg.pfnOpen = pfnOpen;
-    _jpeg.pfnClose = pfnClose;
-    _jpeg.iMaxMCUs = 1000; // set to an unnaturally high value to start
-    _jpeg.JPEGFile.fHandle = (*pfnOpen)(szFilename, &_jpeg.JPEGFile.iSize);
-    if (_jpeg.JPEGFile.fHandle == NULL)
-       return 0;
-    return JPEGInit(&_jpeg);
+    return JPEG_open(&_jpeg, szFilename, pfnOpen, pfnClose, pfnRead, pfnSeek, pfnDraw);
 
 } /* open() */
 
@@ -189,15 +135,7 @@ int JPEGDEC::open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOS
 //
 int JPEGDEC::open(void *fHandle, int iDataSize, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
-    _jpeg.pfnRead = pfnRead;
-    _jpeg.pfnSeek = pfnSeek;
-    _jpeg.pfnDraw = pfnDraw;
-    _jpeg.pfnClose = pfnClose;
-    _jpeg.iMaxMCUs = 1000; // set to an unnaturally high value to start
-    _jpeg.JPEGFile.iSize = iDataSize;
-    _jpeg.JPEGFile.fHandle = fHandle;
-    return JPEGInit(&_jpeg);
+    return JPEG_openHandle(&_jpeg, fHandle, iDataSize, pfnClose, pfnRead, pfnSeek, pfnDraw);
 } /* open() */
 
 #ifdef FS_H
@@ -217,22 +155,13 @@ static void FileClose(void *handle)
 int JPEGDEC::open(File &file, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     if (!file) return 0;
-    memset(&_jpeg, 0, sizeof(JPEGIMAGE));
-    _jpeg.pfnRead = FileRead;
-    _jpeg.pfnSeek = FileSeek;
-    _jpeg.pfnClose = FileClose;
-    _jpeg.pfnDraw = pfnDraw;
-    _jpeg.iMaxMCUs = 1000;
-    _jpeg.JPEGFile.fHandle = &file;
-    _jpeg.JPEGFile.iSize = file.size();
-    return JPEGInit(&_jpeg);
+    return JPEG_openHandle(&_jpeg, &file, file.size(), FileClose, FileRead, FileSeek, pfnDraw);
 }
 #endif // FS_H
 
 void JPEGDEC::close()
 {
-    if (_jpeg.pfnClose)
-        (*_jpeg.pfnClose)(_jpeg.JPEGFile.fHandle);
+    JPEG_close(&_jpeg);
 } /* close() */
 
 //
@@ -243,31 +172,22 @@ void JPEGDEC::close()
 //
 int JPEGDEC::decode(int x, int y, int iOptions)
 {
-    _jpeg.iXOffset = x;
-    _jpeg.iYOffset = y;
-    _jpeg.iOptions = iOptions;
-    return DecodeJPEG(&_jpeg);
+    return JPEG_decode(&_jpeg, x, y, iOptions);
 } /* decode() */
 //
 // set draw callback user pointer variable
 //
 void JPEGDEC::setUserPointer(void *p)
 {
-    _jpeg.pUser = p;
+    JPEG_setUserPointer(&_jpeg, p);
 }
 
 int JPEGDEC::decodeDither(int x, int y, uint8_t *pDither, int iOptions)
 {
-    _jpeg.iXOffset = x;
-    _jpeg.iYOffset = y;
-    _jpeg.iOptions = iOptions;
-    _jpeg.pDitherBuffer = pDither;
-    return DecodeJPEG(&_jpeg);
+    return JPEG_decodeDitherAt(&_jpeg, x, y, pDither, iOptions);
 }
 
 int JPEGDEC::decodeDither(uint8_t *pDither, int iOptions)
 {
-    _jpeg.iOptions = iOptions;
-    _jpeg.pDitherBuffer = pDither;
-    return DecodeJPEG(&_jpeg);
+    return JPEG_decodeDither(&_jpeg, pDither, iOptions);
 }

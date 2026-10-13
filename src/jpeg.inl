@@ -65,6 +65,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb);
 static void JPEGGetMoreData(JPEGIMAGE *pPage);
 static int DecodeJPEG(JPEGIMAGE *pImage);
 static int32_t readRAM(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
+static int32_t readFLASH(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
 static int32_t seekMem(JPEGFILE *pFile, int32_t iPosition);
 #if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined(_WIN64)
 static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen);
@@ -553,7 +554,6 @@ static const uint16_t usRangeTableB[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x00
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-#if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined(_WIN64)
 //
 // API for C
 //
@@ -575,6 +575,51 @@ int JPEG_openRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize, JPEG_DRAW_CALL
     pJPEG->iMaxMCUs = 1000; // set to an unnaturally high value to start
     return JPEGInit(pJPEG);
 } /* JPEG_openRAM() */
+
+int JPEG_openFLASH(JPEGIMAGE *pJPEG, const uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
+{
+    memset(pJPEG, 0, sizeof(JPEGIMAGE));
+    pJPEG->ucMemType = JPEG_MEM_FLASH;
+    pJPEG->pfnRead = readFLASH;
+    pJPEG->pfnSeek = seekMem;
+    pJPEG->pfnDraw = pfnDraw;
+    pJPEG->pfnOpen = NULL;
+    pJPEG->pfnClose = NULL;
+    pJPEG->JPEGFile.iSize = iDataSize;
+    pJPEG->JPEGFile.pData = (uint8_t *)pData;
+    pJPEG->iMaxMCUs = 1000; // set to an unnaturally high value to start
+    return JPEGInit(pJPEG);
+} /* JPEG_openFLASH() */
+
+int JPEG_open(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
+{
+    memset(pJPEG, 0, sizeof(JPEGIMAGE));
+    pJPEG->pfnRead = pfnRead;
+    pJPEG->pfnSeek = pfnSeek;
+    pJPEG->pfnDraw = pfnDraw;
+    pJPEG->pfnOpen = pfnOpen;
+    pJPEG->pfnClose = pfnClose;
+    pJPEG->iMaxMCUs = 1000; // set to an unnaturally high value to start
+    pJPEG->JPEGFile.fHandle = (*pfnOpen)(szFilename, &pJPEG->JPEGFile.iSize);
+    if (pJPEG->JPEGFile.fHandle == NULL)
+       return 0;
+    return JPEGInit(pJPEG);
+} /* JPEG_open() */
+
+int JPEG_openHandle(JPEGIMAGE *pJPEG, void *fHandle, int iDataSize, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
+{
+    memset(pJPEG, 0, sizeof(JPEGIMAGE));
+    pJPEG->pfnRead = pfnRead;
+    pJPEG->pfnSeek = pfnSeek;
+    pJPEG->pfnDraw = pfnDraw;
+    pJPEG->pfnClose = pfnClose;
+    pJPEG->iMaxMCUs = 1000; // set to an unnaturally high value to start
+    pJPEG->JPEGFile.iSize = iDataSize;
+    pJPEG->JPEGFile.fHandle = fHandle;
+    return JPEGInit(pJPEG);
+} /* JPEG_openHandle() */
+
+#if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined(_WIN64)
 //
 // File initialization
 //
@@ -596,6 +641,7 @@ int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *
     fseek((FILE *)pJPEG->JPEGFile.fHandle, 0, SEEK_SET);
     return JPEGInit(pJPEG);
 } /* JPEG_openFile() */
+#endif
 
 int JPEG_getLastError(JPEGIMAGE *pJPEG)
 {
@@ -640,10 +686,28 @@ int JPEG_getThumbHeight(JPEGIMAGE *pJPEG)
     return pJPEG->iThumbHeight;
 } /* JPEG_getThumbHeight() */
 
+int JPEG_getJPEGType(JPEGIMAGE *pJPEG)
+{
+    return (pJPEG->ucMode == 0xc2) ? JPEG_MODE_PROGRESSIVE : JPEG_MODE_BASELINE;
+} /* JPEG_getJPEGType() */
+
+void JPEG_setUserPointer(JPEGIMAGE *pJPEG, void *p)
+{
+    pJPEG->pUser = p;
+} /* JPEG_setUserPointer() */
+
 void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType)
 {
-    pJPEG->ucPixelType = (uint8_t)iType;
+    if (iType >= 0 && iType < INVALID_PIXEL_TYPE)
+        pJPEG->ucPixelType = (uint8_t)iType;
+    else
+        pJPEG->iError = JPEG_INVALID_PARAMETER;
 } /* JPEG_setPixelType() */
+
+int JPEG_getPixelType(JPEGIMAGE *pJPEG)
+{
+    return (int)pJPEG->ucPixelType;
+} /* JPEG_getPixelType() */
 
 void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs)
 {
@@ -667,13 +731,20 @@ int JPEG_decodeDither(JPEGIMAGE *pJPEG, uint8_t *pDither, int iOptions)
     return DecodeJPEG(pJPEG);
 } /* JPEG_decodeDither() */
 
+int JPEG_decodeDitherAt(JPEGIMAGE *pJPEG, int x, int y, uint8_t *pDither, int iOptions)
+{
+    pJPEG->iXOffset = x;
+    pJPEG->iYOffset = y;
+    pJPEG->iOptions = iOptions;
+    pJPEG->pDitherBuffer = pDither;
+    return DecodeJPEG(pJPEG);
+} /* JPEG_decodeDitherAt() */
+
 void JPEG_close(JPEGIMAGE *pJPEG)
 {
     if (pJPEG->pfnClose)
         (*pJPEG->pfnClose)(pJPEG->JPEGFile.fHandle);
 } /* JPEG_close() */
-
-#endif // !__cplusplus
 
 //
 // Validate/adjust the requested crop area to land on MCU boundaries
@@ -791,17 +862,6 @@ static int32_t seekFile(JPEGFILE *pFile, int32_t iPosition)
     fseek((FILE *)pFile->fHandle, iPosition, SEEK_SET);
     return iPosition;
 } /* seekFile() */
-
-static void * openFile(const char *szFilename, int32_t *pFileSize)
-{
-FILE *f;
-    f = fopen(szFilename, "r+b");
-    if (!f) return NULL;
-    fseek(f, 0, SEEK_END);
-    *pFileSize = (int32_t)ftell(f);
-    fseek(f, 0, SEEK_SET);
-    return (void *)f;
-} /* openFile() */
 
 static int32_t readFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
@@ -1432,7 +1492,7 @@ static int JPEGFilter(uint8_t *pBuf, uint8_t *d, int iLen, uint8_t *bFF)
 {
 #ifdef HAS_SSE
 	__m128i xmmIn, xmmOut;
-        __m128i xmmFF = _mm_cmpeq_epi8(xmmIn, xmmIn);
+        __m128i xmmFF = _mm_set1_epi8((char)-1);
 #endif // HAS_SSE
 #ifdef HAS_NEON
 	uint8x16_t u816FF = vdupq_n_u8(0xff);
@@ -1840,7 +1900,7 @@ static int JPEGDecodeMCU_P(JPEGIMAGE *pJPEG, int iMCU, int *iDCPredictor)
     }
 
     iPositive = (1 << pJPEG->cApproxBitsLow); // positive bit position being coded
-    iNegative = ((-1) << pJPEG->cApproxBitsLow); // negative bit position being coded
+    iNegative = -(1 << pJPEG->cApproxBitsLow); // negative bit position being coded
         
     if (pJPEG->iScanStart == 0)
     {

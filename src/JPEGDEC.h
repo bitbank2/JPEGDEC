@@ -287,27 +287,44 @@ class JPEGDEC
 };
 #else
 #define JPEG_STATIC
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int JPEG_openRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
+int JPEG_openFLASH(JPEGIMAGE *pJPEG, const uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw);
+#if defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined(_WIN64)
+int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw);
+#endif
+int JPEG_open(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw);
+int JPEG_openHandle(JPEGIMAGE *pJPEG, void *fHandle, int iDataSize, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw);
 void JPEG_setFramebuffer(JPEGIMAGE *pJPEG, void *pFramebuffer);
 void JPEG_setCropArea(JPEGIMAGE *pJPEG, int x, int y, int w, int h);
 void JPEG_getCropArea(JPEGIMAGE *pJPEG, int *x, int *y, int *w, int *h);
-int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw);
 int JPEG_getWidth(JPEGIMAGE *pJPEG);
 int JPEG_getHeight(JPEGIMAGE *pJPEG);
 int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions);
 int JPEG_decodeDither(JPEGIMAGE *pJPEG, uint8_t *pDither, int iOptions);
+int JPEG_decodeDitherAt(JPEGIMAGE *pJPEG, int x, int y, uint8_t *pDither, int iOptions);
 void JPEG_close(JPEGIMAGE *pJPEG);
 int JPEG_getLastError(JPEGIMAGE *pJPEG);
 int JPEG_getOrientation(JPEGIMAGE *pJPEG);
 int JPEG_getBpp(JPEGIMAGE *pJPEG);
 int JPEG_getSubSample(JPEGIMAGE *pJPEG);
+int JPEG_getJPEGType(JPEGIMAGE *pJPEG);
 int JPEG_hasThumb(JPEGIMAGE *pJPEG);
 int JPEG_getThumbWidth(JPEGIMAGE *pJPEG);
 int JPEG_getThumbHeight(JPEGIMAGE *pJPEG);
-int JPEG_getLastError(JPEGIMAGE *pJPEG);
+void JPEG_setUserPointer(JPEGIMAGE *pJPEG, void *p);
 void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType); // defaults to little endian
+int JPEG_getPixelType(JPEGIMAGE *pJPEG);
 void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs);
-#endif // __cplusplus
+
+#ifdef __cplusplus
+}
+#endif
 
 #ifndef MOTOLONG
 #ifdef ALLOWS_UNALIGNED

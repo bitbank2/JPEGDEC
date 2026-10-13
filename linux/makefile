@@ -1,15 +1,39 @@
-CFLAGS=-c -Wall -O2 -ggdb -D__LINUX__ -I../src
-LIBS = -lm -lpthread
+CFLAGS=-D__LINUX__ -Wall -O2
+ASAN_FLAGS=-fsanitize=address -fno-omit-frame-pointer -O1 -g -Werror=vla
+LIBS=-lm -lpthread
 
 all: libJPEGDEC.a
 
-libJPEGDEC.a: JPEGDEC.o
-	ar -rc libJPEGDEC.a JPEGDEC.o ;\
-	sudo cp libJPEGDEC.a /usr/local/lib ;\
-	sudo cp ../src/JPEGDEC.h /usr/local/include
+libJPEGDEC.a: JPEGDEC.o jpegdec.o
+	ar -rc libJPEGDEC.a JPEGDEC.o jpegdec.o
 
-JPEGDEC.o: ../src/JPEGDEC.cpp ../src/JPEGDEC.h ../src/jpeg.inl
-	$(CXX) $(CFLAGS) ../src/JPEGDEC.cpp
+c_api_test: c_api_test.o jpegdec_asan.o
+	$(CC) $(ASAN_FLAGS) c_api_test.o jpegdec_asan.o $(LIBS) -o c_api_test
+
+cpp_api_test: cpp_api_test.o JPEGDEC_asan.o jpegdec_asan.o
+	$(CXX) $(ASAN_FLAGS) cpp_api_test.o JPEGDEC_asan.o jpegdec_asan.o $(LIBS) -o cpp_api_test
+
+c_api_test.o: c_api_test.c ../src/JPEGDEC.h ../test_images/tulips.h
+	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c c_api_test.c
+
+cpp_api_test.o: cpp_api_test.cpp ../src/JPEGDEC.h ../test_images/tulips.h
+	$(CXX) $(CFLAGS) $(ASAN_FLAGS) -c cpp_api_test.cpp
+
+JPEGDEC.o: ../src/JPEGDEC.cpp ../src/JPEGDEC.h
+	$(CXX) $(CFLAGS) -c ../src/JPEGDEC.cpp
+
+jpegdec.o: ../src/jpegdec.c ../src/jpeg.inl ../src/JPEGDEC.h
+	$(CC) $(CFLAGS) -c ../src/jpegdec.c
+
+JPEGDEC_asan.o: ../src/JPEGDEC.cpp ../src/JPEGDEC.h
+	$(CXX) $(CFLAGS) $(ASAN_FLAGS) -c ../src/JPEGDEC.cpp -o JPEGDEC_asan.o
+
+jpegdec_asan.o: ../src/jpegdec.c ../src/jpeg.inl ../src/JPEGDEC.h
+	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c ../src/jpegdec.c -o jpegdec_asan.o
+
+test: c_api_test cpp_api_test
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./c_api_test
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./cpp_api_test
 
 clean:
-	rm *.o libJPEGDEC.a
+	rm -rf *.o libJPEGDEC.a c_api_test cpp_api_test

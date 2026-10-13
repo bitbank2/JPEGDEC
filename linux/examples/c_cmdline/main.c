@@ -8,7 +8,6 @@
 #include <string.h>
 #include <time.h>
 #include "../../../src/JPEGDEC.h"
-#include "../../../src/jpeg.inl"
 #include "../../../test_images/tulips.h"
 
 // Human readable error messages
