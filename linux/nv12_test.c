@@ -55,18 +55,18 @@ static int test_image(uint8_t *jpeg_data, int jpeg_size, int width, int height)
     memset(y_nv12, GUARD_VALUE, y_size + GUARD_SIZE);
     memset(uv, GUARD_VALUE, uv_size + GUARD_SIZE);
 
-    if (JPEG_openRAM(&jpeg, jpeg_data, jpeg_size, NULL) == 0 ||
-        JPEG_decodeYUV420P(&jpeg, y_planar, y_pitch, cb, chroma_pitch,
+    if (JPEGDEC_openRAM(&jpeg, jpeg_data, jpeg_size, NULL) == 0 ||
+        JPEGDEC_decodeYUV420P(&jpeg, y_planar, y_pitch, cb, chroma_pitch,
                            cr, chroma_pitch) == 0) {
-        fprintf(stderr, "planar decode failed: %d\n", JPEG_getLastError(&jpeg));
+        fprintf(stderr, "planar decode failed: %d\n", JPEGDEC_getLastError(&jpeg));
         result = 0;
         goto out;
     }
-    JPEG_close(&jpeg);
+    JPEGDEC_close(&jpeg);
 
-    if (JPEG_openRAM(&jpeg, jpeg_data, jpeg_size, NULL) == 0 ||
-        JPEG_decodeNV12(&jpeg, y_nv12, y_pitch, uv, uv_pitch) == 0) {
-        fprintf(stderr, "NV12 decode failed: %d\n", JPEG_getLastError(&jpeg));
+    if (JPEGDEC_openRAM(&jpeg, jpeg_data, jpeg_size, NULL) == 0 ||
+        JPEGDEC_decodeNV12(&jpeg, y_nv12, y_pitch, uv, uv_pitch) == 0) {
+        fprintf(stderr, "NV12 decode failed: %d\n", JPEGDEC_getLastError(&jpeg));
         result = 0;
         goto out;
     }
@@ -95,7 +95,7 @@ static int test_image(uint8_t *jpeg_data, int jpeg_size, int width, int height)
     }
 
 out:
-    JPEG_close(&jpeg);
+    JPEGDEC_close(&jpeg);
     free(uv);
     free(y_nv12);
     free(cr);

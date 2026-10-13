@@ -30,26 +30,26 @@ int main(void)
 {
     JPEGIMAGE jpeg;
 
-    if (JPEG_openRAM(&jpeg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw) == 0) {
-        fprintf(stderr, "JPEG_openRAM failed: %d\n", JPEG_getLastError(&jpeg));
+    if (JPEGDEC_openRAM(&jpeg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw) == 0) {
+        fprintf(stderr, "JPEGDEC_openRAM failed: %d\n", JPEGDEC_getLastError(&jpeg));
         return 1;
     }
-    if (JPEG_getWidth(&jpeg) != 640 || JPEG_getHeight(&jpeg) != 480) {
-        fprintf(stderr, "unexpected dimensions: %dx%d\n", JPEG_getWidth(&jpeg),
-                JPEG_getHeight(&jpeg));
+    if (JPEGDEC_getWidth(&jpeg) != 640 || JPEGDEC_getHeight(&jpeg) != 480) {
+        fprintf(stderr, "unexpected dimensions: %dx%d\n", JPEGDEC_getWidth(&jpeg),
+                JPEGDEC_getHeight(&jpeg));
         return 1;
     }
 
-    JPEG_setPixelType(&jpeg, JPEGD_PIXEL_RGB565_LE);
-    if (JPEG_getPixelType(&jpeg) != JPEGD_PIXEL_RGB565_LE) {
+    JPEGDEC_setPixelType(&jpeg, JPEGD_PIXEL_RGB565_LE);
+    if (JPEGDEC_getPixelType(&jpeg) != JPEGD_PIXEL_RGB565_LE) {
         fprintf(stderr, "unexpected pixel type\n");
         return 1;
     }
-    if (JPEG_decode(&jpeg, 0, 0, 0) == 0) {
-        fprintf(stderr, "JPEG_decode failed: %d\n", JPEG_getLastError(&jpeg));
+    if (JPEGDEC_decode(&jpeg, 0, 0, 0) == 0) {
+        fprintf(stderr, "JPEGDEC_decode failed: %d\n", JPEGDEC_getLastError(&jpeg));
         return 1;
     }
-    JPEG_close(&jpeg);
+    JPEGDEC_close(&jpeg);
 
     if (draw_count == 0 || pixel_count != 640U * 480U) {
         fprintf(stderr, "unexpected callback coverage: %u draws, %u pixels\n",

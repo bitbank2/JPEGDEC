@@ -630,7 +630,7 @@ static int JPEGValidateYUVOutput(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, int
 //
 // Memory initialization
 //
-int JPEG_openRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
+int JPEGDEC_openRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     memset(pJPEG, 0, sizeof(JPEGIMAGE));
     pJPEG->ucMemType = JPEG_MEM_RAM;
@@ -643,9 +643,9 @@ int JPEG_openRAM(JPEGIMAGE *pJPEG, uint8_t *pData, int iDataSize, JPEG_DRAW_CALL
     pJPEG->JPEGFile.pData = pData;
     pJPEG->iMaxMCUs = 1000; // set to an unnaturally high value to start
     return JPEGInit(pJPEG);
-} /* JPEG_openRAM() */
+} /* JPEGDEC_openRAM() */
 
-int JPEG_openFLASH(JPEGIMAGE *pJPEG, const uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
+int JPEGDEC_openFLASH(JPEGIMAGE *pJPEG, const uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     memset(pJPEG, 0, sizeof(JPEGIMAGE));
     pJPEG->ucMemType = JPEG_MEM_FLASH;
@@ -658,9 +658,9 @@ int JPEG_openFLASH(JPEGIMAGE *pJPEG, const uint8_t *pData, int iDataSize, JPEG_D
     pJPEG->JPEGFile.pData = (uint8_t *)pData;
     pJPEG->iMaxMCUs = 1000; // set to an unnaturally high value to start
     return JPEGInit(pJPEG);
-} /* JPEG_openFLASH() */
+} /* JPEGDEC_openFLASH() */
 
-int JPEG_open(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
+int JPEGDEC_open(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     memset(pJPEG, 0, sizeof(JPEGIMAGE));
     pJPEG->pfnRead = pfnRead;
@@ -673,9 +673,9 @@ int JPEG_open(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_OPEN_CALLBACK *pfnO
     if (pJPEG->JPEGFile.fHandle == NULL)
        return 0;
     return JPEGInit(pJPEG);
-} /* JPEG_open() */
+} /* JPEGDEC_open() */
 
-int JPEG_openHandle(JPEGIMAGE *pJPEG, void *fHandle, int iDataSize, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
+int JPEGDEC_openHandle(JPEGIMAGE *pJPEG, void *fHandle, int iDataSize, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     memset(pJPEG, 0, sizeof(JPEGIMAGE));
     pJPEG->pfnRead = pfnRead;
@@ -686,13 +686,13 @@ int JPEG_openHandle(JPEGIMAGE *pJPEG, void *fHandle, int iDataSize, JPEG_CLOSE_C
     pJPEG->JPEGFile.iSize = iDataSize;
     pJPEG->JPEGFile.fHandle = fHandle;
     return JPEGInit(pJPEG);
-} /* JPEG_openHandle() */
+} /* JPEGDEC_openHandle() */
 
 #if defined (__MACH__) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined(_WIN64)
 //
 // File initialization
 //
-int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw)
+int JPEGDEC_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     memset(pJPEG, 0, sizeof(JPEGIMAGE));
     pJPEG->ucMemType = JPEG_MEM_RAM;
@@ -709,91 +709,91 @@ int JPEG_openFile(JPEGIMAGE *pJPEG, const char *szFilename, JPEG_DRAW_CALLBACK *
     pJPEG->JPEGFile.iSize = (int)ftell((FILE *)pJPEG->JPEGFile.fHandle);
     fseek((FILE *)pJPEG->JPEGFile.fHandle, 0, SEEK_SET);
     return JPEGInit(pJPEG);
-} /* JPEG_openFile() */
+} /* JPEGDEC_openFile() */
 #endif
 
-int JPEG_getLastError(JPEGIMAGE *pJPEG)
+int JPEGDEC_getLastError(JPEGIMAGE *pJPEG)
 {
     return pJPEG->iError;
-} /* JPEG_getLastError() */
+} /* JPEGDEC_getLastError() */
 
-int JPEG_getWidth(JPEGIMAGE *pJPEG)
+int JPEGDEC_getWidth(JPEGIMAGE *pJPEG)
 {
     return pJPEG->iWidth;
-} /* JPEG_getWidth() */
+} /* JPEGDEC_getWidth() */
 
-int JPEG_getHeight(JPEGIMAGE *pJPEG)
+int JPEGDEC_getHeight(JPEGIMAGE *pJPEG)
 {
     return pJPEG->iHeight;
-} /* JPEG_getHeight() */
+} /* JPEGDEC_getHeight() */
 
-int JPEG_getOrientation(JPEGIMAGE *pJPEG)
+int JPEGDEC_getOrientation(JPEGIMAGE *pJPEG)
 {
     return (int)pJPEG->ucOrientation;
-} /* JPEG_getOrientation() */
+} /* JPEGDEC_getOrientation() */
 
-int JPEG_getBpp(JPEGIMAGE *pJPEG)
+int JPEGDEC_getBpp(JPEGIMAGE *pJPEG)
 {
     return (int)pJPEG->ucBpp;
-} /* JPEG_getBpp() */
-int JPEG_getSubSample(JPEGIMAGE *pJPEG)
+} /* JPEGDEC_getBpp() */
+int JPEGDEC_getSubSample(JPEGIMAGE *pJPEG)
 {
     return (int)pJPEG->ucSubSample;
-} /* JPEG_getSubSample() */
-int JPEG_hasThumb(JPEGIMAGE *pJPEG)
+} /* JPEGDEC_getSubSample() */
+int JPEGDEC_hasThumb(JPEGIMAGE *pJPEG)
 {
     return (int)pJPEG->ucHasThumb;
-} /* JPEG_hasThumb() */
+} /* JPEGDEC_hasThumb() */
 
-int JPEG_getThumbWidth(JPEGIMAGE *pJPEG)
+int JPEGDEC_getThumbWidth(JPEGIMAGE *pJPEG)
 {
     return pJPEG->iThumbWidth;
-} /* JPEG_getThumbWidth() */
+} /* JPEGDEC_getThumbWidth() */
 
-int JPEG_getThumbHeight(JPEGIMAGE *pJPEG)
+int JPEGDEC_getThumbHeight(JPEGIMAGE *pJPEG)
 {
     return pJPEG->iThumbHeight;
-} /* JPEG_getThumbHeight() */
+} /* JPEGDEC_getThumbHeight() */
 
-int JPEG_getJPEGType(JPEGIMAGE *pJPEG)
+int JPEGDEC_getJPEGType(JPEGIMAGE *pJPEG)
 {
     return (pJPEG->ucMode == 0xc2) ? JPEG_MODE_PROGRESSIVE : JPEG_MODE_BASELINE;
-} /* JPEG_getJPEGType() */
+} /* JPEGDEC_getJPEGType() */
 
-void JPEG_setUserPointer(JPEGIMAGE *pJPEG, void *p)
+void JPEGDEC_setUserPointer(JPEGIMAGE *pJPEG, void *p)
 {
     pJPEG->pUser = p;
-} /* JPEG_setUserPointer() */
+} /* JPEGDEC_setUserPointer() */
 
-void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType)
+void JPEGDEC_setPixelType(JPEGIMAGE *pJPEG, int iType)
 {
     if (iType >= 0 && iType <= JPEGD_PIXEL_ONE_BIT_DITHERED)
         pJPEG->ucPixelType = (uint8_t)iType;
     else
         pJPEG->iError = JPEG_INVALID_PARAMETER;
-} /* JPEG_setPixelType() */
+} /* JPEGDEC_setPixelType() */
 
-int JPEG_getPixelType(JPEGIMAGE *pJPEG)
+int JPEGDEC_getPixelType(JPEGIMAGE *pJPEG)
 {
     return (int)pJPEG->ucPixelType;
-} /* JPEG_getPixelType() */
+} /* JPEGDEC_getPixelType() */
 
-void JPEG_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs)
+void JPEGDEC_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs)
 {
     if (iMaxMCUs < 1)
         iMaxMCUs = 1; // don't allow invalid value
     pJPEG->iMaxMCUs = iMaxMCUs;
-} /* JPEG_setMaxOutputSize() */
+} /* JPEGDEC_setMaxOutputSize() */
 
-int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions)
+int JPEGDEC_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions)
 {
     pJPEG->iXOffset = x;
     pJPEG->iYOffset = y;
     pJPEG->iOptions = iOptions;
     return DecodeJPEG(pJPEG);
-} /* JPEG_decode() */
+} /* JPEGDEC_decode() */
 
-int JPEG_decodeYUV420P(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pCb, int iCbPitch, uint8_t *pCr, int iCrPitch)
+int JPEGDEC_decodeYUV420P(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pCb, int iCbPitch, uint8_t *pCr, int iCrPitch)
 {
     if (pCb == NULL || pCr == NULL || iCrPitch < ((pJPEG->iWidth + 1) >> 1)) {
         pJPEG->iError = JPEG_INVALID_PARAMETER;
@@ -814,9 +814,9 @@ int JPEG_decodeYUV420P(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pCb,
     pJPEG->iXOffset = pJPEG->iYOffset = 0;
     pJPEG->pFramebuffer = NULL;
     return DecodeJPEG(pJPEG);
-} /* JPEG_decodeYUV420P() */
+} /* JPEGDEC_decodeYUV420P() */
 
-int JPEG_decodeNV12(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pUV, int iUVPitch)
+int JPEGDEC_decodeNV12(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pUV, int iUVPitch)
 {
     int iChromaWidth = (pJPEG->iWidth + 1) >> 1;
 
@@ -837,35 +837,35 @@ int JPEG_decodeNV12(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pUV, in
     pJPEG->iXOffset = pJPEG->iYOffset = 0;
     pJPEG->pFramebuffer = NULL;
     return DecodeJPEG(pJPEG);
-} /* JPEG_decodeNV12() */
+} /* JPEGDEC_decodeNV12() */
 
-int JPEG_decodeDither(JPEGIMAGE *pJPEG, uint8_t *pDither, int iOptions)
+int JPEGDEC_decodeDither(JPEGIMAGE *pJPEG, uint8_t *pDither, int iOptions)
 {
     pJPEG->iOptions = iOptions;
     pJPEG->pDitherBuffer = pDither;
     return DecodeJPEG(pJPEG);
-} /* JPEG_decodeDither() */
+} /* JPEGDEC_decodeDither() */
 
-int JPEG_decodeDitherAt(JPEGIMAGE *pJPEG, int x, int y, uint8_t *pDither, int iOptions)
+int JPEGDEC_decodeDitherAt(JPEGIMAGE *pJPEG, int x, int y, uint8_t *pDither, int iOptions)
 {
     pJPEG->iXOffset = x;
     pJPEG->iYOffset = y;
     pJPEG->iOptions = iOptions;
     pJPEG->pDitherBuffer = pDither;
     return DecodeJPEG(pJPEG);
-} /* JPEG_decodeDitherAt() */
+} /* JPEGDEC_decodeDitherAt() */
 
-void JPEG_close(JPEGIMAGE *pJPEG)
+void JPEGDEC_close(JPEGIMAGE *pJPEG)
 {
     if (pJPEG->pfnClose)
         (*pJPEG->pfnClose)(pJPEG->JPEGFile.fHandle);
-} /* JPEG_close() */
+} /* JPEGDEC_close() */
 
 //
 // Validate/adjust the requested crop area to land on MCU boundaries
 // (expand in all directions if needed)
 //
-void JPEG_setCropArea(JPEGIMAGE *pJPEG, int x, int y, int w, int h)
+void JPEGDEC_setCropArea(JPEGIMAGE *pJPEG, int x, int y, int w, int h)
 {
     int mcuCX=0, mcuCY=0;
 
@@ -910,18 +910,18 @@ void JPEG_setCropArea(JPEGIMAGE *pJPEG, int x, int y, int w, int h)
     y &= ~(mcuCY-1);
     pJPEG->iCropX = x; pJPEG->iCropY = y;
     pJPEG->iCropCX = w; pJPEG->iCropCY = h;
-} /* JPEG_setCropArea() */
+} /* JPEGDEC_setCropArea() */
 
-void JPEG_getCropArea(JPEGIMAGE *pJPEG, int *x, int *y, int *w, int *h)
+void JPEGDEC_getCropArea(JPEGIMAGE *pJPEG, int *x, int *y, int *w, int *h)
 {
     *x = pJPEG->iCropX; *y = pJPEG->iCropY;
     *w = pJPEG->iCropCX; *h = pJPEG->iCropCY;
-} /* JPEG_getCropArea() */
+} /* JPEGDEC_getCropArea() */
 
-void JPEG_setFramebuffer(JPEGIMAGE *pJPEG, void *pFramebuffer)
+void JPEGDEC_setFramebuffer(JPEGIMAGE *pJPEG, void *pFramebuffer)
 {
     pJPEG->pFramebuffer = pFramebuffer;
-} /* JPEG_setFramebuffer() */
+} /* JPEGDEC_setFramebuffer() */
 
 //
 // Helper functions for memory based images

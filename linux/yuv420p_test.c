@@ -57,19 +57,19 @@ static int test_image(uint8_t *jpeg_data, int jpeg_size, int width, int height)
     memset(cb, GUARD_VALUE, chroma_size + GUARD_SIZE);
     memset(cr, GUARD_VALUE, chroma_size + GUARD_SIZE);
 
-    if (JPEG_openRAM(&jpeg, jpeg_data, jpeg_size, NULL) == 0) {
-        fprintf(stderr, "JPEG_openRAM failed: %d\n", JPEG_getLastError(&jpeg));
+    if (JPEGDEC_openRAM(&jpeg, jpeg_data, jpeg_size, NULL) == 0) {
+        fprintf(stderr, "JPEGDEC_openRAM failed: %d\n", JPEGDEC_getLastError(&jpeg));
         result = 0;
         goto out;
     }
-    if (JPEG_getWidth(&jpeg) != width || JPEG_getHeight(&jpeg) != height) {
-        fprintf(stderr, "unexpected dimensions: %dx%d\n", JPEG_getWidth(&jpeg),
-                JPEG_getHeight(&jpeg));
+    if (JPEGDEC_getWidth(&jpeg) != width || JPEGDEC_getHeight(&jpeg) != height) {
+        fprintf(stderr, "unexpected dimensions: %dx%d\n", JPEGDEC_getWidth(&jpeg),
+                JPEGDEC_getHeight(&jpeg));
         result = 0;
         goto out;
     }
-    if (JPEG_decodeYUV420P(&jpeg, y, y_pitch, cb, chroma_pitch, cr, chroma_pitch) == 0) {
-        fprintf(stderr, "JPEG_decodeYUV420P failed: %d\n", JPEG_getLastError(&jpeg));
+    if (JPEGDEC_decodeYUV420P(&jpeg, y, y_pitch, cb, chroma_pitch, cr, chroma_pitch) == 0) {
+        fprintf(stderr, "JPEGDEC_decodeYUV420P failed: %d\n", JPEGDEC_getLastError(&jpeg));
         result = 0;
         goto out;
     }
@@ -87,7 +87,7 @@ static int test_image(uint8_t *jpeg_data, int jpeg_size, int width, int height)
     }
 
 out:
-    JPEG_close(&jpeg);
+    JPEGDEC_close(&jpeg);
     free(y);
     free(cb);
     free(cr);

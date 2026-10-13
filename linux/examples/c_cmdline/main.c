@@ -161,7 +161,7 @@ int ConvertFileTest(char *argv[], int iFraction)
     }
 
     ucPixelType = JPEGD_PIXEL_RGB565_LE; //JPEGD_PIXEL_RGB8888; // generate 32-bit pixels for a Windows BMP file
-    rc = JPEG_openFile(&jpg, argv[1], NULL);
+    rc = JPEGDEC_openFile(&jpg, argv[1], NULL);
     if (!rc) {
         printf("Error opening file %s\n", argv[1]);
         return -1;
@@ -182,19 +182,19 @@ int ConvertFileTest(char *argv[], int iFraction)
         printf("Error allocating %d bytes\n", i);
         return -1;
     }
-    JPEG_setFramebuffer(&jpg, pFrame);
+    JPEGDEC_setFramebuffer(&jpg, pFrame);
     jpg.ucPixelType = ucPixelType;
     lTime = micros();
     printf("Converting %d x %d image, fraction = %d\n", cx, cy, iFraction);
-    if (JPEG_decode(&jpg, 0, 0, iOption)) {
+    if (JPEGDEC_decode(&jpg, 0, 0, iOption)) {
         lTime = micros() - lTime;
         printf("JPEG decoded in %d us\n", (int)lTime);
         WriteBMP(argv[2], pFrame, NULL, cx, cy, bpp, iDestPitch);
     } else {
-        printf("Decode failed, last error = %s\n", szErrors[JPEG_getLastError(&jpg)]);
+        printf("Decode failed, last error = %s\n", szErrors[JPEGDEC_getLastError(&jpg)]);
         return -1;
     }
-    JPEG_close(&jpg);
+    JPEGDEC_close(&jpg);
     return 0;
 } /* ConvertFileTest() */
 
@@ -211,68 +211,68 @@ int PerfTest(int argc, char *argv[])
 
     // first test full size decoding
     if (argc == 1) {
-        rc = JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
+        rc = JPEGDEC_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
     } else {
-        rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
+        rc = JPEGDEC_openFile(&jpg, argv[1], JPEGDraw);
     }
     if (rc)
     {
         lTime = micros();
 //        jpg.pDitherBuffer = ucDitherBuffer; // not used in this test
         jpg.ucPixelType = ucPixelType;
-        if (JPEG_decode(&jpg, 0, 0, 0)) { // full size
+        if (JPEGDEC_decode(&jpg, 0, 0, 0)) { // full size
             lTime = micros() - lTime;
             printf("full sized decode in %d us\n", (int)lTime);
         } else {
-            printf("Decode failed, last error = %d\n", JPEG_getLastError(&jpg));
+            printf("Decode failed, last error = %d\n", JPEGDEC_getLastError(&jpg));
         return 0;
         }
-        JPEG_close(&jpg);
+        JPEGDEC_close(&jpg);
     } else {
-        printf("open() failed, last error = %d\n", JPEG_getLastError(&jpg));
+        printf("open() failed, last error = %d\n", JPEGDEC_getLastError(&jpg));
         return -1;
     }
 // Half size scaled test
     if (argc == 2)
-        rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
+        rc = JPEGDEC_openFile(&jpg, argv[1], JPEGDraw);
     else
-        rc = JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
+        rc = JPEGDEC_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
     if (rc)
     {
         lTime = micros();
-        if (JPEG_decode(&jpg, 0, 0, JPEG_SCALE_HALF)) { // 1/2 size
+        if (JPEGDEC_decode(&jpg, 0, 0, JPEG_SCALE_HALF)) { // 1/2 size
             lTime = micros() - lTime;
             printf("half sized decode in %d us\n", (int)lTime);
         }
-        JPEG_close(&jpg);
+        JPEGDEC_close(&jpg);
     }
     // Quarter size scaled test
     if (argc == 2)
-        rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
+        rc = JPEGDEC_openFile(&jpg, argv[1], JPEGDraw);
     else
-        rc = JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
+        rc = JPEGDEC_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
     if (rc)
     {
         lTime = micros();
-        if (JPEG_decode(&jpg, 0, 0, JPEG_SCALE_QUARTER)) { // 1/4 size
+        if (JPEGDEC_decode(&jpg, 0, 0, JPEG_SCALE_QUARTER)) { // 1/4 size
             lTime = micros() - lTime;
             printf("quarter sized decode in %d us\n", (int)lTime);
         }
-        JPEG_close(&jpg);
+        JPEGDEC_close(&jpg);
     }
     // Eighth size scaled test
     if (argc == 2)
-        rc = JPEG_openFile(&jpg, argv[1], JPEGDraw);
+        rc = JPEGDEC_openFile(&jpg, argv[1], JPEGDraw);
     else
-        rc = JPEG_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
+        rc = JPEGDEC_openRAM(&jpg, (uint8_t *)tulips, sizeof(tulips), JPEGDraw);
     if (rc)
     {
         lTime = micros();
-        if (JPEG_decode(&jpg, 0, 0, JPEG_SCALE_EIGHTH)) { // 1/8 size
+        if (JPEGDEC_decode(&jpg, 0, 0, JPEG_SCALE_EIGHTH)) { // 1/8 size
             lTime = micros() - lTime;
             printf("eighth sized decode in %d us\n", (int)lTime);
         }
-        JPEG_close(&jpg);
+        JPEGDEC_close(&jpg);
     }
     return 0; // done
 } /* PerfTest() */

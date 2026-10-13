@@ -26,99 +26,99 @@
 
 void JPEGDEC::setFramebuffer(void *pFramebuffer)
 {
-    JPEG_setFramebuffer(&_jpeg, pFramebuffer);
+    JPEGDEC_setFramebuffer(&_jpeg, pFramebuffer);
 } /* setFramebuffer() */
 
 int JPEGDEC::getPixelType()
 {
-    return JPEG_getPixelType(&_jpeg);
+    return JPEGDEC_getPixelType(&_jpeg);
 }
 void JPEGDEC::setPixelType(int iType)
 {
-    JPEG_setPixelType(&_jpeg, iType);
+    JPEGDEC_setPixelType(&_jpeg, iType);
 } /* setPixelType() */
 
 void JPEGDEC::setMaxOutputSize(int iMaxMCUs)
 {
-    JPEG_setMaxOutputSize(&_jpeg, iMaxMCUs);
+    JPEGDEC_setMaxOutputSize(&_jpeg, iMaxMCUs);
 } /* setMaxOutputSize() */
 //
 // Memory initialization
 //
 int JPEGDEC::openRAM(uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    return JPEG_openRAM(&_jpeg, pData, iDataSize, pfnDraw);
+    return JPEGDEC_openRAM(&_jpeg, pData, iDataSize, pfnDraw);
 } /* openRAM() */
 
 int JPEGDEC::openFLASH(const uint8_t *pData, int iDataSize, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    return JPEG_openFLASH(&_jpeg, pData, iDataSize, pfnDraw);
+    return JPEGDEC_openFLASH(&_jpeg, pData, iDataSize, pfnDraw);
 } /* openFLASH() */
 
 int JPEGDEC::getOrientation()
 {
-    return JPEG_getOrientation(&_jpeg);
+    return JPEGDEC_getOrientation(&_jpeg);
 } /* getOrientation() */
 
 int JPEGDEC::getLastError()
 {
-    return JPEG_getLastError(&_jpeg);
+    return JPEGDEC_getLastError(&_jpeg);
 } /* getLastError() */
 
 int JPEGDEC::getWidth()
 {
-    return JPEG_getWidth(&_jpeg);
+    return JPEGDEC_getWidth(&_jpeg);
 } /* getWidth() */
 
 int JPEGDEC::getHeight()
 {
-    return JPEG_getHeight(&_jpeg);
+    return JPEGDEC_getHeight(&_jpeg);
 } /* getHeight() */
 
 int JPEGDEC::hasThumb()
 {
-    return JPEG_hasThumb(&_jpeg);
+    return JPEGDEC_hasThumb(&_jpeg);
 } /* hasThumb() */
 
 int JPEGDEC::getThumbWidth()
 {
-    return JPEG_getThumbWidth(&_jpeg);
+    return JPEGDEC_getThumbWidth(&_jpeg);
 } /* getThumbWidth() */
 
 int JPEGDEC::getThumbHeight()
 {
-    return JPEG_getThumbHeight(&_jpeg);
+    return JPEGDEC_getThumbHeight(&_jpeg);
 } /* getThumbHeight() */
 
 int JPEGDEC::getBpp()
 {
-    return JPEG_getBpp(&_jpeg);
+    return JPEGDEC_getBpp(&_jpeg);
 } /* getBpp() */
 
 int JPEGDEC::getSubSample()
 {
-    return JPEG_getSubSample(&_jpeg);
+    return JPEGDEC_getSubSample(&_jpeg);
 } /* getSubSample() */
 
 void JPEGDEC::setCropArea(int x, int y, int w, int h)
 {
-    JPEG_setCropArea(&_jpeg, x, y, w, h);
+    JPEGDEC_setCropArea(&_jpeg, x, y, w, h);
 } /* setCropArea() */
 
 void JPEGDEC::getCropArea(int *x, int *y, int *w, int *h)
 {
-    JPEG_getCropArea(&_jpeg, x, y, w, h);
+    JPEGDEC_getCropArea(&_jpeg, x, y, w, h);
 } /* getCropArea() */
 
 int JPEGDEC::getJPEGType()
 {
-    return JPEG_getJPEGType(&_jpeg);
+    return JPEGDEC_getJPEGType(&_jpeg);
 } /* getJPEGType() */
 
 #ifdef __LINUX__
 int JPEGDEC::open(const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    return JPEG_openFile(&_jpeg, szFilename, pfnDraw);
+    return JPEGDEC_openFile(&_jpeg, szFilename, pfnDraw);
 } /* open() */
 #endif // __LINUX__
 //
@@ -126,7 +126,7 @@ int JPEGDEC::open(const char *szFilename, JPEG_DRAW_CALLBACK *pfnDraw)
 //
 int JPEGDEC::open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    return JPEG_open(&_jpeg, szFilename, pfnOpen, pfnClose, pfnRead, pfnSeek, pfnDraw);
+    return JPEGDEC_open(&_jpeg, szFilename, pfnOpen, pfnClose, pfnRead, pfnSeek, pfnDraw);
 
 } /* open() */
 
@@ -135,7 +135,7 @@ int JPEGDEC::open(const char *szFilename, JPEG_OPEN_CALLBACK *pfnOpen, JPEG_CLOS
 //
 int JPEGDEC::open(void *fHandle, int iDataSize, JPEG_CLOSE_CALLBACK *pfnClose, JPEG_READ_CALLBACK *pfnRead, JPEG_SEEK_CALLBACK *pfnSeek, JPEG_DRAW_CALLBACK *pfnDraw)
 {
-    return JPEG_openHandle(&_jpeg, fHandle, iDataSize, pfnClose, pfnRead, pfnSeek, pfnDraw);
+    return JPEGDEC_openHandle(&_jpeg, fHandle, iDataSize, pfnClose, pfnRead, pfnSeek, pfnDraw);
 } /* open() */
 
 #ifdef FS_H
@@ -155,13 +155,13 @@ static void FileClose(void *handle)
 int JPEGDEC::open(File &file, JPEG_DRAW_CALLBACK *pfnDraw)
 {
     if (!file) return 0;
-    return JPEG_openHandle(&_jpeg, &file, file.size(), FileClose, FileRead, FileSeek, pfnDraw);
+    return JPEGDEC_openHandle(&_jpeg, &file, file.size(), FileClose, FileRead, FileSeek, pfnDraw);
 }
 #endif // FS_H
 
 void JPEGDEC::close()
 {
-    JPEG_close(&_jpeg);
+    JPEGDEC_close(&_jpeg);
 } /* close() */
 
 //
@@ -172,32 +172,32 @@ void JPEGDEC::close()
 //
 int JPEGDEC::decode(int x, int y, int iOptions)
 {
-    return JPEG_decode(&_jpeg, x, y, iOptions);
+    return JPEGDEC_decode(&_jpeg, x, y, iOptions);
 } /* decode() */
 
 int JPEGDEC::decodeYUV420P(uint8_t *pY, int iYPitch, uint8_t *pCb, int iCbPitch, uint8_t *pCr, int iCrPitch)
 {
-    return JPEG_decodeYUV420P(&_jpeg, pY, iYPitch, pCb, iCbPitch, pCr, iCrPitch);
+    return JPEGDEC_decodeYUV420P(&_jpeg, pY, iYPitch, pCb, iCbPitch, pCr, iCrPitch);
 } /* decodeYUV420P() */
 
 int JPEGDEC::decodeNV12(uint8_t *pY, int iYPitch, uint8_t *pUV, int iUVPitch)
 {
-    return JPEG_decodeNV12(&_jpeg, pY, iYPitch, pUV, iUVPitch);
+    return JPEGDEC_decodeNV12(&_jpeg, pY, iYPitch, pUV, iUVPitch);
 } /* decodeNV12() */
 //
 // set draw callback user pointer variable
 //
 void JPEGDEC::setUserPointer(void *p)
 {
-    JPEG_setUserPointer(&_jpeg, p);
+    JPEGDEC_setUserPointer(&_jpeg, p);
 }
 
 int JPEGDEC::decodeDither(int x, int y, uint8_t *pDither, int iOptions)
 {
-    return JPEG_decodeDitherAt(&_jpeg, x, y, pDither, iOptions);
+    return JPEGDEC_decodeDitherAt(&_jpeg, x, y, pDither, iOptions);
 }
 
 int JPEGDEC::decodeDither(uint8_t *pDither, int iOptions)
 {
-    return JPEG_decodeDither(&_jpeg, pDither, iOptions);
+    return JPEGDEC_decodeDither(&_jpeg, pDither, iOptions);
 }
