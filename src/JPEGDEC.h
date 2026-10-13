@@ -11,8 +11,8 @@
 // limitations under the License.
 //===========================================================================
 //
-#ifndef __JPEGDEC__
-#define __JPEGDEC__
+#ifndef JPEGDEC_H
+#define JPEGDEC_H
 #if defined( JPEGDEC_NO_ARDUINO ) || defined( __MACH__ ) || defined( __LINUX__ ) || defined( __MCUXPRESSO ) || defined( ESP_PLATFORM ) || defined(_WIN64)
 #include <stdlib.h>
 #include <string.h>
@@ -311,4 +311,4 @@ void JPEGDEC_setMaxOutputSize(JPEGIMAGE *pJPEG, int iMaxMCUs);
 }
 #endif
 
-#endif // __JPEGDEC__
+#endif // JPEGDEC_H
