@@ -24,8 +24,10 @@
 #include <FS.h>
 #endif
 #endif
-#ifndef PROGMEM
+#ifndef memcpy_P
 #define memcpy_P memcpy
+#endif
+#ifndef PROGMEM
 #define PROGMEM
 #endif
 //
@@ -233,7 +235,6 @@ typedef struct jpeg_image_tag
 #if defined(__has_include) && __has_include(<FS.h>)
 #include "FS.h"
 #endif
-#define JPEG_STATIC static
 //
 // The JPEGDEC class wraps portable C code which does the actual work
 //
@@ -278,8 +279,6 @@ class JPEGDEC
   private:
     JPEGIMAGE _jpeg;
 };
-#else
-#define JPEG_STATIC
 #endif
 
 #ifdef __cplusplus
