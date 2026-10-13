@@ -94,7 +94,7 @@ void s3_ycbcr_convert_444(uint8_t *pY, uint8_t *pCB, uint8_t *pCR, uint16_t *pOu
 void s3_ycbcr_convert_420(uint8_t *pY, uint8_t *pCB, uint8_t *pCR, uint16_t *pOut, int16_t *pConsts, uint8_t ucPixelType);
 void s3_dequant(int16_t *pMCU, int16_t *pQuant);
 }
-int16_t i16_Consts[8] = {0x80, 113, 90, 22, 46, 1,32,2048};
+static int16_t i16_Consts[8] = {0x80, 113, 90, 22, 46, 1,32,2048};
 #endif // S3 SIMD
 #endif // __has_include
 #endif // ESP32
@@ -162,32 +162,30 @@ static const int16_t __attribute__((aligned(16))) s1082[8] = {4433*2,4433*2,4433
 
 #ifdef HAS_SSE
 #if defined ( __GNUC__ ) || defined( _GCC_ANDROID ) || defined( __APPLE__)
-signed short s1402[8] __attribute__((aligned(16))) = { 5742, 5742, 5742, 5742, 5742, 5742, 5742, 5742 };
-signed short s0714[8] __attribute__((aligned(16))) = { -2925, -2925, -2925, -2925, -2925, -2925, -2925, -2925 };
-signed short s0344[8] __attribute__((aligned(16))) = { -1409, -1409, -1409, -1409, -1409, -1409, -1409, -1409 };
-signed short s1772[8] __attribute__((aligned(16))) = { 7258, 7258, 7258, 7258, 7258, 7258, 7258, 7258 };
+static signed short s1402[8] __attribute__((aligned(16))) = { 5742, 5742, 5742, 5742, 5742, 5742, 5742, 5742 };
+static signed short s0714[8] __attribute__((aligned(16))) = { -2925, -2925, -2925, -2925, -2925, -2925, -2925, -2925 };
+static signed short s0344[8] __attribute__((aligned(16))) = { -1409, -1409, -1409, -1409, -1409, -1409, -1409, -1409 };
+static signed short s1772[8] __attribute__((aligned(16))) = { 7258, 7258, 7258, 7258, 7258, 7258, 7258, 7258 };
 // 16-bit constants for IDCT calculation
-signed short s0414[8] __attribute__((aligned(16))) = { 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4 }; // 1.414213562 - 1.0
-signed short s1414[8] __attribute__((aligned(16))) = { 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4 }; // 1.414213562
-signed short s1847[8] __attribute__((aligned(16))) = { 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4 }; // 1.8477
-signed short s2613[8] __attribute__((aligned(16))) = { -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2 }; // -2.6131259
-signed short sp2613[8] __attribute__((aligned(16))) = { 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2 }; // 2.6131259
-signed short s1082[8] __attribute__((aligned(16))) = { 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4 }; // 1.08239
-signed short sfastDCT[8] __attribute__((aligned(16))) = { 4096, 4096, 4096, 4096, -815, 2320, 3472, 4096 };
+static signed short s0414[8] __attribute__((aligned(16))) = { 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4, 1697 * 4 }; // 1.414213562 - 1.0
+static signed short s1414[8] __attribute__((aligned(16))) = { 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4, 5793 * 4 }; // 1.414213562
+static signed short s1847[8] __attribute__((aligned(16))) = { 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4, 7568 * 4 }; // 1.8477
+static signed short s2613[8] __attribute__((aligned(16))) = { -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2, -10703 * 2 }; // -2.6131259
+static signed short sp2613[8] __attribute__((aligned(16))) = { 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2, 10703 * 2 }; // 2.6131259
+static signed short s1082[8] __attribute__((aligned(16))) = { 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4, 4433 * 4 }; // 1.08239
 #else
 // 16-bit Constants for SSE ycc->rgb conversion
-__declspec(align(16)) signed short s1402[8] = {5742,5742,5742,5742,5742,5742,5742,5742};
-__declspec(align(16)) signed short s0714[8] = {-2925,-2925,-2925,-2925,-2925,-2925,-2925,-2925};
-__declspec(align(16)) signed short s0344[8] = {-1409,-1409,-1409,-1409,-1409,-1409,-1409,-1409};
-__declspec(align(16)) signed short s1772[8] = {7258,7258,7258,7258,7258,7258,7258,7258};
+__declspec(align(16)) static signed short s1402[8] = {5742,5742,5742,5742,5742,5742,5742,5742};
+__declspec(align(16)) static signed short s0714[8] = {-2925,-2925,-2925,-2925,-2925,-2925,-2925,-2925};
+__declspec(align(16)) static signed short s0344[8] = {-1409,-1409,-1409,-1409,-1409,-1409,-1409,-1409};
+__declspec(align(16)) static signed short s1772[8] = {7258,7258,7258,7258,7258,7258,7258,7258};
 // 16-bit constants for IDCT calculation
-__declspec(align(16)) signed short s0414[8] = {1697*4,1697*4,1697*4,1697*4,1697*4,1697*4,1697*4,1697*4}; // 1.414213562 - 1.0
-__declspec(align(16)) signed short s1414[8] = {5793*4,5793*4,5793*4,5793*4,5793*4,5793*4,5793*4,5793*4}; // 1.414213562
-__declspec(align(16)) signed short s1847[8] = {7568*4,7568*4,7568*4,7568*4,7568*4,7568*4,7568*4,7568*4}; // 1.8477
-__declspec(align(16)) signed short s2613[8] = {-10703*2,-10703*2,-10703*2,-10703*2,-10703*2,-10703*2,-10703*2,-10703*2}; // -2.6131259
-__declspec(align(16)) signed short sp2613[8] = {10703*2,10703*2,10703*2,10703*2,10703*2,10703*2,10703*2,10703*2}; // 2.6131259
-__declspec(align(16)) signed short s1082[8] = {4433*4,4433*4,4433*4,4433*4,4433*4,4433*4,4433*4,4433*4}; // 1.08239
-__declspec(align(16)) signed short sfastDCT[8] = {4096,4096,4096,4096,-815,2320,3472,4096};
+__declspec(align(16)) static signed short s0414[8] = {1697*4,1697*4,1697*4,1697*4,1697*4,1697*4,1697*4,1697*4}; // 1.414213562 - 1.0
+__declspec(align(16)) static signed short s1414[8] = {5793*4,5793*4,5793*4,5793*4,5793*4,5793*4,5793*4,5793*4}; // 1.414213562
+__declspec(align(16)) static signed short s1847[8] = {7568*4,7568*4,7568*4,7568*4,7568*4,7568*4,7568*4,7568*4}; // 1.8477
+__declspec(align(16)) static signed short s2613[8] = {-10703*2,-10703*2,-10703*2,-10703*2,-10703*2,-10703*2,-10703*2,-10703*2}; // -2.6131259
+__declspec(align(16)) static signed short sp2613[8] = {10703*2,10703*2,10703*2,10703*2,10703*2,10703*2,10703*2,10703*2}; // 2.6131259
+__declspec(align(16)) static signed short s1082[8] = {4433*4,4433*4,4433*4,4433*4,4433*4,4433*4,4433*4,4433*4}; // 1.08239
 #endif // GCC
 #endif // HAS_SSE
 
