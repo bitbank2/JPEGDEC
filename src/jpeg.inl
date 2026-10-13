@@ -558,6 +558,24 @@ static const uint16_t usRangeTableB[] = {0x0000,0x0000,0x0000,0x0000,0x0000,0x00
 // API for C
 //
 
+static int JPEGValidateYUVOutput(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, int iChromaPitch)
+{
+    int iChromaWidth = (pJPEG->iWidth + 1) >> 1;
+
+    if (pY == NULL || iYPitch < pJPEG->iWidth || iChromaPitch < iChromaWidth ||
+        pJPEG->iCropX != 0 || pJPEG->iCropY != 0 ||
+        pJPEG->iCropCX != pJPEG->iWidth || pJPEG->iCropCY != pJPEG->iHeight ||
+        (pJPEG->ucNumComponents != 1 && pJPEG->ucNumComponents != 3)) {
+        pJPEG->iError = JPEG_INVALID_PARAMETER;
+        return 0;
+    }
+    if (pJPEG->ucMode == 0xc2) {
+        pJPEG->iError = JPEG_UNSUPPORTED_FEATURE;
+        return 0;
+    }
+    return 1;
+}
+
 //
 // Memory initialization
 //
@@ -723,6 +741,28 @@ int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions)
     pJPEG->iOptions = iOptions;
     return DecodeJPEG(pJPEG);
 } /* JPEG_decode() */
+
+int JPEG_decodeYUV420P(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pCb, int iCbPitch, uint8_t *pCr, int iCrPitch)
+{
+    if (pCb == NULL || pCr == NULL || iCbPitch != iCrPitch) {
+        pJPEG->iError = JPEG_INVALID_PARAMETER;
+        return 0;
+    }
+    if (!JPEGValidateYUVOutput(pJPEG, pY, iYPitch, iCbPitch)) {
+        return 0;
+    }
+    pJPEG->ucPixelType = YUV420P;
+    pJPEG->pY = pY;
+    pJPEG->pCb = pCb;
+    pJPEG->pCr = pCr;
+    pJPEG->iYPitch = iYPitch;
+    pJPEG->iCbPitch = iCbPitch;
+    pJPEG->iCrPitch = iCrPitch;
+    pJPEG->iOptions = 0;
+    pJPEG->iXOffset = pJPEG->iYOffset = 0;
+    pJPEG->pFramebuffer = NULL;
+    return DecodeJPEG(pJPEG);
+} /* JPEG_decodeYUV420P() */
 
 int JPEG_decodeDither(JPEGIMAGE *pJPEG, uint8_t *pDither, int iOptions)
 {
@@ -4999,6 +5039,105 @@ uint8_t pixelmask=0, shift=0;
     } // for y
 } /* JPEGDither() */
 
+static uint8_t JPEGGetMCULuma(JPEGIMAGE *pJPEG, int x, int y)
+{
+    int iBlock = 0;
+    uint8_t *p;
+
+    switch (pJPEG->ucSubSample) {
+        case 0x21:
+            iBlock = x >> 3;
+            break;
+        case 0x12:
+            iBlock = y >> 3;
+            break;
+        case 0x22:
+            iBlock = ((y >> 3) << 1) + (x >> 3);
+            break;
+        default:
+            break;
+    }
+    p = (uint8_t *)&pJPEG->sMCUs[iBlock * DCTSIZE];
+    return p[((y & 7) << 3) + (x & 7)];
+} /* JPEGGetMCULuma() */
+
+static uint8_t JPEGGetMCUChroma(JPEGIMAGE *pJPEG, uint8_t *p, int x, int y)
+{
+    switch (pJPEG->ucSubSample) {
+        case 0x21:
+            x >>= 1;
+            break;
+        case 0x12:
+            y >>= 1;
+            break;
+        case 0x22:
+            x >>= 1;
+            y >>= 1;
+            break;
+        default:
+            break;
+    }
+    return p[(y << 3) + x];
+} /* JPEGGetMCUChroma() */
+
+static void JPEGPutMCUYUV420(JPEGIMAGE *pJPEG, int x, int y, int mcuCX, int mcuCY)
+{
+    int cx, cy, i, j;
+    int iCr = MCU1, iCb = MCU2;
+    uint8_t *pMCUCb = NULL, *pMCUCr = NULL;
+
+    cx = pJPEG->iWidth - x;
+    if (cx > mcuCX) cx = mcuCX;
+    cy = pJPEG->iHeight - y;
+    if (cy > mcuCY) cy = mcuCY;
+
+    for (i=0; i<cy; i++) {
+        uint8_t *d = &pJPEG->pY[(y+i)*pJPEG->iYPitch+x];
+
+        for (j=0; j<cx; j++) {
+            d[j] = JPEGGetMCULuma(pJPEG, j, i);
+        }
+    }
+
+    if (pJPEG->ucNumComponents == 3) {
+        if (pJPEG->ucSubSample == 0x12 || pJPEG->ucSubSample == 0x21) {
+            iCr = MCU2;
+            iCb = MCU3;
+        } else if (pJPEG->ucSubSample == 0x22) {
+            iCr = MCU4;
+            iCb = MCU5;
+        }
+        pMCUCr = (uint8_t *)&pJPEG->sMCUs[iCr];
+        pMCUCb = (uint8_t *)&pJPEG->sMCUs[iCb];
+    }
+
+    for (i=0; i<(cy+1)/2; i++) {
+        int sy0 = i*2;
+        int sy1 = sy0+1;
+
+        if (sy1 >= cy) sy1 = cy-1;
+        for (j=0; j<(cx+1)/2; j++) {
+            int sx0 = j*2;
+            int sx1 = sx0+1;
+            uint8_t cb = 128, cr = 128;
+
+            if (sx1 >= cx) sx1 = cx-1;
+            if (pMCUCb != NULL) {
+                cb = (uint8_t)((JPEGGetMCUChroma(pJPEG, pMCUCr, sx0, sy0) +
+                                JPEGGetMCUChroma(pJPEG, pMCUCr, sx1, sy0) +
+                                JPEGGetMCUChroma(pJPEG, pMCUCr, sx0, sy1) +
+                                JPEGGetMCUChroma(pJPEG, pMCUCr, sx1, sy1) + 2) >> 2);
+                cr = (uint8_t)((JPEGGetMCUChroma(pJPEG, pMCUCb, sx0, sy0) +
+                                JPEGGetMCUChroma(pJPEG, pMCUCb, sx1, sy0) +
+                                JPEGGetMCUChroma(pJPEG, pMCUCb, sx0, sy1) +
+                                JPEGGetMCUChroma(pJPEG, pMCUCb, sx1, sy1) + 2) >> 2);
+            }
+            pJPEG->pCb[((y>>1)+i)*pJPEG->iCbPitch+(x>>1)+j] = cb;
+            pJPEG->pCr[((y>>1)+i)*pJPEG->iCrPitch+(x>>1)+j] = cr;
+        }
+    }
+} /* JPEGPutMCUYUV420() */
+
 //
 // Decode the image
 // returns 0 for error, 1 for success
@@ -5282,7 +5421,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 // first chroma
                 pJPEG->ucACTable = cACTable1;
                 pJPEG->ucDCTable = cDCTable1;
-                if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
+                if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE && pJPEG->ucPixelType < YUV420P) {
                     // We're not going to use the color channels, so avoid as much work as possible
                     if (pJPEG->ucMode == 0xc2) { // progressive
                         iErr |= JPEGDecodeMCU_P(pJPEG, MCU_SKIP, &iDCPred1);
@@ -5334,7 +5473,9 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 }
             } // if color components present
             if (!iSkipMask) { // this MCU is not skipped
-                if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
+                if (pJPEG->ucPixelType == YUV420P) {
+                    JPEGPutMCUYUV420(pJPEG, x*mcuCX, y*mcuCY, mcuCX, mcuCY);
+                } else if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
                     JPEGPutMCU8BitGray(pJPEG, xoff, iPitch); // grayscale or color is being drawn as grayscale
                 } else {
                     switch (pJPEG->ucSubSample) {
@@ -5357,7 +5498,8 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 } // normal MCU drawing
                 xoff += mcuCX;
             } // if not skipped
-            if (pJPEG->pFramebuffer == NULL && (xoff == iPitch || x == cx-1) && !iSkipMask) // time to draw
+            if (pJPEG->pFramebuffer == NULL && pJPEG->ucPixelType != YUV420P &&
+                (xoff == iPitch || x == cx-1) && !iSkipMask) // time to draw
             {
                 int iAdjust;
                 int iCurW, iCurH;

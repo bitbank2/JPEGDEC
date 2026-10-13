@@ -107,6 +107,8 @@ enum {
     FOUR_BIT_DITHERED,
     TWO_BIT_DITHERED,
     ONE_BIT_DITHERED,
+    // planar YUV 4:2:0
+    YUV420P,
     INVALID_PIXEL_TYPE
 };
 
@@ -232,6 +234,8 @@ typedef struct jpeg_image_tag
     int16_t *sMCUs; // needs to be 16-byte aligned for S3 SIMD
     int16_t sUnalignedMCUs[8+(DCTSIZE * MAX_MCU_COUNT)]; // 4:2:0 needs 6 DCT blocks per MCU
     void *pFramebuffer;
+    uint8_t *pY, *pCb, *pCr;
+    int iYPitch, iCbPitch, iCrPitch;
     int16_t sQuantTable[DCTSIZE*4]; // quantization tables
     uint8_t ucFileBuf[JPEG_FILE_BUF_SIZE]; // holds temp data and pixel stack
     uint8_t ucHuffDC[DC_TABLE_SIZE * 2]; // up to 2 'short' tables
@@ -265,6 +269,7 @@ class JPEGDEC
 #endif
     void close();
     int decode(int x, int y, int iOptions);
+    int decodeYUV420P(uint8_t *pY, int iYPitch, uint8_t *pCb, int iCbPitch, uint8_t *pCr, int iCrPitch);
     int decodeDither(uint8_t *pDither, int iOptions);
     int decodeDither(int x, int y, uint8_t *pDither, int iOptions);
     int getOrientation();
@@ -306,6 +311,7 @@ void JPEG_getCropArea(JPEGIMAGE *pJPEG, int *x, int *y, int *w, int *h);
 int JPEG_getWidth(JPEGIMAGE *pJPEG);
 int JPEG_getHeight(JPEGIMAGE *pJPEG);
 int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions);
+int JPEG_decodeYUV420P(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pCb, int iCbPitch, uint8_t *pCr, int iCrPitch);
 int JPEG_decodeDither(JPEGIMAGE *pJPEG, uint8_t *pDither, int iOptions);
 int JPEG_decodeDitherAt(JPEGIMAGE *pJPEG, int x, int y, uint8_t *pDither, int iOptions);
 void JPEG_close(JPEGIMAGE *pJPEG);

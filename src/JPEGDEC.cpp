@@ -174,6 +174,11 @@ int JPEGDEC::decode(int x, int y, int iOptions)
 {
     return JPEG_decode(&_jpeg, x, y, iOptions);
 } /* decode() */
+
+int JPEGDEC::decodeYUV420P(uint8_t *pY, int iYPitch, uint8_t *pCb, int iCbPitch, uint8_t *pCr, int iCrPitch)
+{
+    return JPEG_decodeYUV420P(&_jpeg, pY, iYPitch, pCb, iCbPitch, pCr, iCrPitch);
+} /* decodeYUV420P() */
 //
 // set draw callback user pointer variable
 //
