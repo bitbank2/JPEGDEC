@@ -187,6 +187,11 @@ __declspec(align(16)) static signed short s2613[8] = {-10703*2,-10703*2,-10703*2
 __declspec(align(16)) static signed short sp2613[8] = {10703*2,10703*2,10703*2,10703*2,10703*2,10703*2,10703*2,10703*2}; // 2.6131259
 __declspec(align(16)) static signed short s1082[8] = {4433*4,4433*4,4433*4,4433*4,4433*4,4433*4,4433*4,4433*4}; // 1.08239
 #endif // GCC
+
+static inline __m128i JPEGDSwapRGB565BytesSSE(__m128i pixels)
+{
+    return _mm_or_si128(_mm_slli_epi16(pixels, 8), _mm_srli_epi16(pixels, 8));
+}
 #endif // HAS_SSE
 
 // For AA&N IDCT method, multipliers are equal to quantization
@@ -3684,6 +3689,8 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxG = _mm_slli_epi16(mmxG, 5); // set in proper position
          mmxTemp = _mm_or_si128(mmxR, mmxG); // R+G
          mmxTemp = _mm_or_si128(mmxTemp, mmxB); // R+G+B
+         if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
+             mmxTemp = JPEGDSwapRGB565BytesSSE(mmxTemp);
          _mm_storeu_si128((__m128i *)pOutput, mmxTemp); // write 8 RGB565 pixels
          pOutput += iPitch;
          } // for each row
@@ -4371,6 +4378,8 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxG = _mm_slli_epi16(mmxG, 5); // set in proper position
          mmxTemp = _mm_or_si128(mmxR, mmxG); // R+G
          mmxTemp = _mm_or_si128(mmxTemp, mmxB); // R+G+B
+         if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
+             mmxTemp = JPEGDSwapRGB565BytesSSE(mmxTemp);
          // store first row of pair
          _mm_storeu_si128((__m128i *)pOutput, mmxTemp); // write 8 RGB565 pixels
          // second row of left block
@@ -4403,6 +4412,8 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxG = _mm_slli_epi16(mmxG, 5); // set in proper position
          mmxTemp = _mm_or_si128(mmxR, mmxG); // R+G
          mmxTemp = _mm_or_si128(mmxTemp, mmxB); // R+G+B
+         if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
+             mmxTemp = JPEGDSwapRGB565BytesSSE(mmxTemp);
          // store second row of pair
          _mm_storeu_si128((__m128i *)(pOutput+iPitch), mmxTemp); // write 8 RGB565 pixels
          // right block
@@ -4435,6 +4446,8 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxG = _mm_slli_epi16(mmxG, 5); // set in proper position
          mmxTemp = _mm_or_si128(mmxR, mmxG); // R+G
          mmxTemp = _mm_or_si128(mmxTemp, mmxB); // R+G+B
+         if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
+             mmxTemp = JPEGDSwapRGB565BytesSSE(mmxTemp);
          // store first row of right block
          _mm_storeu_si128((__m128i *)(pOutput+8), mmxTemp); // write 8 RGB565 pixels
          // prepare second row of right block
@@ -4467,6 +4480,8 @@ static void JPEGPutMCU22(JPEGIMAGE *pJPEG, int x, int iPitch)
          mmxG = _mm_slli_epi16(mmxG, 5); // set in proper position
          mmxTemp = _mm_or_si128(mmxR, mmxG); // R+G
          mmxTemp = _mm_or_si128(mmxTemp, mmxB); // R+G+B
+         if (pJPEG->ucPixelType == JPEGD_PIXEL_RGB565_BE)
+             mmxTemp = JPEGDSwapRGB565BytesSSE(mmxTemp);
          // store second row of right block
          _mm_storeu_si128((__m128i *)(pOutput+8+iPitch), mmxTemp); // write 8 RGB565 pixels
 

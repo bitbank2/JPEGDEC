@@ -23,6 +23,9 @@ yuv420p_test: yuv420p_test.o jpegdec_asan.o
 nv12_test: nv12_test.o jpegdec_asan.o
 	$(CC) $(ASAN_FLAGS) nv12_test.o jpegdec_asan.o $(LIBS) -o nv12_test
 
+rgb565_endian_test: rgb565_endian_test.o jpegdec_asan.o
+	$(CC) $(ASAN_FLAGS) rgb565_endian_test.o jpegdec_asan.o $(LIBS) -o rgb565_endian_test
+
 c_api_test.o: c_api_test.c ../src/JPEGDEC.h ../test_images/tulips.h
 	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c c_api_test.c
 
@@ -37,6 +40,9 @@ yuv420p_test.o: yuv420p_test.c ../src/JPEGDEC.h ../test_images/tulips.h
 
 nv12_test.o: nv12_test.c ../src/JPEGDEC.h ../test_images/tulips.h
 	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c nv12_test.c
+
+rgb565_endian_test.o: rgb565_endian_test.c ../src/JPEGDEC.h ../test_images/tulips.h ../test_images/zebra.h
+	$(CC) $(CFLAGS) $(ASAN_FLAGS) -c rgb565_endian_test.c
 
 JPEGDEC.o: ../src/JPEGDEC.cpp ../src/JPEGDEC.h
 	$(CXX) $(CFLAGS) -c ../src/JPEGDEC.cpp
@@ -56,12 +62,13 @@ jpegdec_no_arduino.o: ../src/jpegdec.c ../src/jpeg.inl ../src/JPEGDEC.h
 JPEGDEC_no_arduino.o: ../src/JPEGDEC.cpp ../src/JPEGDEC.h
 	$(CXX) $(PORTABLE_FLAGS) -c ../src/JPEGDEC.cpp -o JPEGDEC_no_arduino.o
 
-test: c_api_test cpp_api_test progressive_test yuv420p_test nv12_test jpegdec_no_arduino.o JPEGDEC_no_arduino.o
+test: c_api_test cpp_api_test progressive_test yuv420p_test nv12_test rgb565_endian_test jpegdec_no_arduino.o JPEGDEC_no_arduino.o
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./c_api_test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./cpp_api_test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./progressive_test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./yuv420p_test
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./nv12_test
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ./rgb565_endian_test
 
 clean:
-	rm -rf *.o libJPEGDEC.a c_api_test cpp_api_test progressive_test yuv420p_test nv12_test
+	rm -rf *.o libJPEGDEC.a c_api_test cpp_api_test progressive_test yuv420p_test nv12_test rgb565_endian_test
