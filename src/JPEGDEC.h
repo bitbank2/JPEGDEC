@@ -40,16 +40,13 @@
 //
 
 /* Defines and variables */
-#define FILE_HIGHWATER 1536
-#define JPEG_FILE_BUF_SIZE 2048
-#define HUFF_TABLEN  273
-#define HUFF11SIZE (1<<11)
-#define DC_TABLE_SIZE 1024
-#define DCTSIZE 64
-#define MAX_MCU_COUNT 6
-#define MAX_COMPS_IN_SCAN 4
-#define MAX_BUFFERED_PIXELS 2048
-#define MCU_SKIP -8
+#define JPEGD_FILE_BUFFER_SIZE 2048
+#define JPEGD_HUFF11_SIZE (1<<11)
+#define JPEGD_DC_TABLE_SIZE 1024
+#define JPEGD_DCT_SIZE 64
+#define JPEGD_MAX_MCU_COUNT 6
+#define JPEGD_MAX_COMPONENTS_IN_SCAN 4
+#define JPEGD_MAX_BUFFERED_PIXELS 2048
 
 // Decoder options
 #define JPEG_AUTO_ROTATE 1
@@ -61,21 +58,15 @@
 #define JPEG_LUMA_ONLY 64
 #define JPEG_USES_DMA 128
 
-#define MCU0 (DCTSIZE * 0)
-#define MCU1 (DCTSIZE * 1)
-#define MCU2 (DCTSIZE * 2)
-#define MCU3 (DCTSIZE * 3)
-#define MCU4 (DCTSIZE * 4)
-#define MCU5 (DCTSIZE * 5)
 
 #if defined(__arm64__) || defined(__aarch64__) || defined (__x86_64__)
-#define REGISTER_WIDTH 64
-typedef uint64_t my_ulong;
-typedef int64_t my_long;
+#define JPEGD_REGISTER_WIDTH 64
+typedef uint64_t jpegd_word_t;
+typedef int64_t jpegd_signed_word_t;
 #else
-#define REGISTER_WIDTH 32
-typedef uint32_t my_ulong;
-typedef int32_t my_long;
+#define JPEGD_REGISTER_WIDTH 32
+typedef uint32_t jpegd_word_t;
+typedef int32_t jpegd_signed_word_t;
 #endif
 
 // Supported decode modes
@@ -116,12 +107,12 @@ enum {
     JPEG_ERROR_MEMORY
 };
 
-typedef struct buffered_bits
+typedef struct jpegd_buffered_bits
 {
 unsigned char *pBuf; // buffer pointer
-my_ulong ulBits; // buffered bits
+jpegd_word_t ulBits; // buffered bits
 uint32_t ulBitOff; // current bit offset
-} BUFFERED_BITS;
+} JPEGD_BUFFERED_BITS;
 
 typedef struct jpeg_file_tag
 {
@@ -149,7 +140,7 @@ typedef void * (JPEG_OPEN_CALLBACK)(const char *szFilename, int32_t *pFileSize);
 typedef void (JPEG_CLOSE_CALLBACK)(void *pHandle);
 
 /* JPEG color component info */
-typedef struct _jpegcompinfo
+typedef struct jpegd_comp_info
 {
 // These values are fixed over the whole image
 // For compression, they must be supplied by the user interface
@@ -213,22 +204,22 @@ typedef struct jpeg_image_tag
     JPEG_DRAW_CALLBACK *pfnDraw;
     JPEG_OPEN_CALLBACK *pfnOpen;
     JPEG_CLOSE_CALLBACK *pfnClose;
-    JPEGCOMPINFO JPCI[MAX_COMPS_IN_SCAN]; /* Max color components */
+    JPEGCOMPINFO JPCI[JPEGD_MAX_COMPONENTS_IN_SCAN]; /* Max color components */
     JPEGFILE JPEGFile;
-    BUFFERED_BITS bb;
+    JPEGD_BUFFERED_BITS bb;
     void *pUser;
     uint8_t *pDitherBuffer; // provided externally to do Floyd-Steinberg dithering
     uint16_t *usPixels; // needs to be 16-byte aligned for S3 SIMD
-    uint16_t usUnalignedPixels[MAX_BUFFERED_PIXELS+8];
+    uint16_t usUnalignedPixels[JPEGD_MAX_BUFFERED_PIXELS+8];
     int16_t *sMCUs; // needs to be 16-byte aligned for S3 SIMD
-    int16_t sUnalignedMCUs[8+(DCTSIZE * MAX_MCU_COUNT)]; // 4:2:0 needs 6 DCT blocks per MCU
+    int16_t sUnalignedMCUs[8+(JPEGD_DCT_SIZE * JPEGD_MAX_MCU_COUNT)]; // 4:2:0 needs 6 DCT blocks per MCU
     void *pFramebuffer;
     uint8_t *pY, *pCb, *pCr, *pUV;
     int iYPitch, iCbPitch, iCrPitch, iUVPitch;
-    int16_t sQuantTable[DCTSIZE*4]; // quantization tables
-    uint8_t ucFileBuf[JPEG_FILE_BUF_SIZE]; // holds temp data and pixel stack
-    uint8_t ucHuffDC[DC_TABLE_SIZE * 2]; // up to 2 'short' tables
-    uint16_t usHuffAC[HUFF11SIZE * 2];
+    int16_t sQuantTable[JPEGD_DCT_SIZE*4]; // quantization tables
+    uint8_t ucFileBuf[JPEGD_FILE_BUFFER_SIZE]; // holds temp data and pixel stack
+    uint8_t ucHuffDC[JPEGD_DC_TABLE_SIZE * 2]; // up to 2 'short' tables
+    uint16_t usHuffAC[JPEGD_HUFF11_SIZE * 2];
 } JPEGIMAGE;
 
 #ifdef __cplusplus
