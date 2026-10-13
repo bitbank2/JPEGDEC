@@ -716,7 +716,7 @@ void JPEG_setUserPointer(JPEGIMAGE *pJPEG, void *p)
 
 void JPEG_setPixelType(JPEGIMAGE *pJPEG, int iType)
 {
-    if (iType >= 0 && iType < INVALID_PIXEL_TYPE)
+    if (iType >= 0 && iType <= ONE_BIT_DITHERED)
         pJPEG->ucPixelType = (uint8_t)iType;
     else
         pJPEG->iError = JPEG_INVALID_PARAMETER;
@@ -744,7 +744,7 @@ int JPEG_decode(JPEGIMAGE *pJPEG, int x, int y, int iOptions)
 
 int JPEG_decodeYUV420P(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pCb, int iCbPitch, uint8_t *pCr, int iCrPitch)
 {
-    if (pCb == NULL || pCr == NULL || iCbPitch != iCrPitch) {
+    if (pCb == NULL || pCr == NULL || iCrPitch < ((pJPEG->iWidth + 1) >> 1)) {
         pJPEG->iError = JPEG_INVALID_PARAMETER;
         return 0;
     }
@@ -755,6 +755,7 @@ int JPEG_decodeYUV420P(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pCb,
     pJPEG->pY = pY;
     pJPEG->pCb = pCb;
     pJPEG->pCr = pCr;
+    pJPEG->pUV = NULL;
     pJPEG->iYPitch = iYPitch;
     pJPEG->iCbPitch = iCbPitch;
     pJPEG->iCrPitch = iCrPitch;
@@ -763,6 +764,29 @@ int JPEG_decodeYUV420P(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pCb,
     pJPEG->pFramebuffer = NULL;
     return DecodeJPEG(pJPEG);
 } /* JPEG_decodeYUV420P() */
+
+int JPEG_decodeNV12(JPEGIMAGE *pJPEG, uint8_t *pY, int iYPitch, uint8_t *pUV, int iUVPitch)
+{
+    int iChromaWidth = (pJPEG->iWidth + 1) >> 1;
+
+    if (pUV == NULL || iUVPitch < iChromaWidth * 2) {
+        pJPEG->iError = JPEG_INVALID_PARAMETER;
+        return 0;
+    }
+    if (!JPEGValidateYUVOutput(pJPEG, pY, iYPitch, iChromaWidth)) {
+        return 0;
+    }
+    pJPEG->ucPixelType = NV12;
+    pJPEG->pY = pY;
+    pJPEG->pCb = pJPEG->pCr = NULL;
+    pJPEG->pUV = pUV;
+    pJPEG->iYPitch = iYPitch;
+    pJPEG->iUVPitch = iUVPitch;
+    pJPEG->iOptions = 0;
+    pJPEG->iXOffset = pJPEG->iYOffset = 0;
+    pJPEG->pFramebuffer = NULL;
+    return DecodeJPEG(pJPEG);
+} /* JPEG_decodeNV12() */
 
 int JPEG_decodeDither(JPEGIMAGE *pJPEG, uint8_t *pDither, int iOptions)
 {
@@ -5132,8 +5156,15 @@ static void JPEGPutMCUYUV420(JPEGIMAGE *pJPEG, int x, int y, int mcuCX, int mcuC
                                 JPEGGetMCUChroma(pJPEG, pMCUCb, sx0, sy1) +
                                 JPEGGetMCUChroma(pJPEG, pMCUCb, sx1, sy1) + 2) >> 2);
             }
-            pJPEG->pCb[((y>>1)+i)*pJPEG->iCbPitch+(x>>1)+j] = cb;
-            pJPEG->pCr[((y>>1)+i)*pJPEG->iCrPitch+(x>>1)+j] = cr;
+            if (pJPEG->ucPixelType == YUV420P) {
+                pJPEG->pCb[((y>>1)+i)*pJPEG->iCbPitch+(x>>1)+j] = cb;
+                pJPEG->pCr[((y>>1)+i)*pJPEG->iCrPitch+(x>>1)+j] = cr;
+            } else {
+                uint8_t *d = &pJPEG->pUV[((y>>1)+i)*pJPEG->iUVPitch+(x>>1)*2+j*2];
+
+                d[0] = cb;
+                d[1] = cr;
+            }
         }
     }
 } /* JPEGPutMCUYUV420() */
@@ -5473,7 +5504,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 }
             } // if color components present
             if (!iSkipMask) { // this MCU is not skipped
-                if (pJPEG->ucPixelType == YUV420P) {
+                if (pJPEG->ucPixelType == YUV420P || pJPEG->ucPixelType == NV12) {
                     JPEGPutMCUYUV420(pJPEG, x*mcuCX, y*mcuCY, mcuCX, mcuCY);
                 } else if (pJPEG->ucPixelType >= EIGHT_BIT_GRAYSCALE) {
                     JPEGPutMCU8BitGray(pJPEG, xoff, iPitch); // grayscale or color is being drawn as grayscale
@@ -5499,7 +5530,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                 xoff += mcuCX;
             } // if not skipped
             if (pJPEG->pFramebuffer == NULL && pJPEG->ucPixelType != YUV420P &&
-                (xoff == iPitch || x == cx-1) && !iSkipMask) // time to draw
+                pJPEG->ucPixelType != NV12 && (xoff == iPitch || x == cx-1) && !iSkipMask) // time to draw
             {
                 int iAdjust;
                 int iCurW, iCurH;

@@ -179,6 +179,11 @@ int JPEGDEC::decodeYUV420P(uint8_t *pY, int iYPitch, uint8_t *pCb, int iCbPitch,
 {
     return JPEG_decodeYUV420P(&_jpeg, pY, iYPitch, pCb, iCbPitch, pCr, iCrPitch);
 } /* decodeYUV420P() */
+
+int JPEGDEC::decodeNV12(uint8_t *pY, int iYPitch, uint8_t *pUV, int iUVPitch)
+{
+    return JPEG_decodeNV12(&_jpeg, pY, iYPitch, pUV, iUVPitch);
+} /* decodeNV12() */
 //
 // set draw callback user pointer variable
 //
