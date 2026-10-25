@@ -3411,109 +3411,110 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
 // R = Y                + 1.40200 * Cr
 // G = Y - 0.34414 * Cb + 0.28586 * Cr - Cr
 // B = Y - 0.22800 * Cb + Cb + Cb
-
- if (pJPEG->ucPixelType == RGB8888) {
-    __m128i mmxY, mmxCr, mmxCb, mmxTemp;
-    __m128i mmxTemp2, mmxR, mmxG, mmxB;
-        iPitch *= 2; // points to 32-bit values, not 16-bit
-      mmxTemp2 = _mm_cmpeq_epi16(_mm_setzero_si128(), _mm_setzero_si128()); // fix Cr/Cb values by subtracting 0x80
-      mmxTemp2 = _mm_slli_epi16 (mmxTemp2, 15); // now has 0x8000, 0x8000...
-      for (iRow=0; iRow<8; iRow++) { // do 8 rows
-         mmxCr = _mm_loadl_epi64((__m128i *)pCr); // load 1 row of Cr
-         mmxCb = _mm_loadl_epi64((__m128i *)pCb); // load 1 row of Cb
-         mmxY = _mm_loadl_epi64((__m128i *)pY); // load 1 row of Y
-         pCr += 8;
-         pCb += 8;
-         pY += 8;
-         mmxCr = _mm_unpacklo_epi8 (_mm_setzero_si128(), mmxCr); // zero-extend 8 Cr values to 16-bits
-         mmxCb = _mm_unpacklo_epi8 (_mm_setzero_si128(), mmxCb); // zero-extend 8 Cb values to 16-bits
-         mmxY = _mm_unpacklo_epi8 (mmxY, _mm_setzero_si128()); // zero-extend 8 Y values to 16-bits
-         mmxCr = _mm_add_epi16(mmxCr, mmxTemp2); // subtract 0x80
-         mmxCb = _mm_add_epi16(mmxCb, mmxTemp2);  // subtract 0x80
-         mmxY = _mm_slli_epi16(mmxY, 4); // x16 to put on par with Cr/Cb values
-         mmxTemp =  _mm_loadu_si128((__m128i *)&s1402[0]); // load the 1.402 constant
-         mmxTemp = _mm_mulhi_epi16(mmxCr, mmxTemp); // almost ready with R
-         mmxR = _mm_add_epi16(mmxTemp, mmxY); // now we have 8 R values
-         mmxTemp = _mm_loadu_si128((__m128i *)&s0714[0]);
-         mmxR = _mm_srai_epi16(mmxR, 4);
-         mmxR = _mm_packus_epi16 (mmxR, mmxR); // i16->u8 bit and saturate
-         mmxTemp = _mm_mulhi_epi16(mmxCr, mmxTemp); // Y-0.71414*Cr
-         mmxG = _mm_add_epi16(mmxY, mmxTemp);
-         mmxTemp = _mm_loadu_si128((__m128i *)&s0344[0]); // Y -= 0.34414*Cb
-         mmxTemp = _mm_mulhi_epi16(mmxCb, mmxTemp);
-         mmxG = _mm_add_epi16(mmxG, mmxTemp); // now we have 8 G values
-         mmxG = _mm_srai_epi16(mmxG, 4);
-         mmxG = _mm_packus_epi16 (mmxG, mmxG); // i16->u8 bit and saturate
-         mmxTemp = _mm_loadu_si128((__m128i *)&s1772[0]); // B = Y - 1.772*Cb
-         mmxTemp = _mm_mulhi_epi16(mmxCb, mmxTemp);
-         mmxB = _mm_add_epi16(mmxY, mmxTemp); // now we have 8 B values
-         mmxB = _mm_srai_epi16(mmxB, 4);
-         mmxB = _mm_packus_epi16 (mmxB, mmxB); // i16->u8 bit and saturate
-         mmxTemp = _mm_cmpeq_epi16(mmxTemp, mmxTemp); // Alpha set to FFFF
-         mmxCr = _mm_unpacklo_epi8(mmxB, mmxG); // interleave 8 B's and 8 G's
-         mmxCb = _mm_unpacklo_epi8(mmxR, mmxTemp); // interlave 8 R's and 8 A's
-         mmxTemp = _mm_unpacklo_epi16(mmxCr, mmxCb); // interleave 4 BG's and 4 RA's
-         mmxCr = _mm_unpackhi_epi16(mmxCr, mmxCb); // interleave 4 BG's and 4 RA's
-//         _mm_stream_si128((__m128i*)pOutput, mmxTemp);
-//	_mm_stream_si128((__m128i*)(pOutput+8), mmxCr); 
-         _mm_storeu_si128((__m128i *)pOutput, mmxTemp); // write 4 RGBA pixels
-         _mm_storeu_si128((__m128i *)(pOutput+8), mmxCr); // write 4 RGBA pixels
-         pOutput += iPitch;
-         } // for each row
-     return;
-     } else { // 16-bpp
-        __m128i mmxY, mmxCr, mmxCb, mmxTemp;
-        __m128i mmxTemp2, mmxR, mmxG, mmxB;
-      for (iRow=0; iRow<8; iRow++) { // do 8 rows
-         mmxCr = _mm_loadl_epi64((__m128i *)pCr); // load 1 row of Cr
-         mmxCb = _mm_loadl_epi64((__m128i *)pCb); // load 1 row of Cb
-         mmxY = _mm_loadl_epi64((__m128i *)pY); // load 1 row of Y
-         pCr += 8;
-         pCb += 8;
-         pY += 8;
-         mmxTemp = _mm_cmpeq_epi16(mmxY, mmxY); // fix Cr/Cb values by subtracting 0x80
-         mmxTemp = _mm_slli_epi16 (mmxTemp, 15); // now has 0x8000, 0x8000...
-         mmxTemp2 = _mm_setzero_si128(); // zero it to use to set upper bits to 0
-         mmxCr = _mm_unpacklo_epi8 (mmxTemp2, mmxCr); // zero-extend 8 Cr values to 16-bits
-         mmxCb = _mm_unpacklo_epi8 (mmxTemp2, mmxCb); // zero-extend 8 Cb values to 16-bits
-         mmxY = _mm_unpacklo_epi8 (mmxY, mmxTemp2); // zero-extend 8 Y values to 16-bits
-         mmxY = _mm_slli_epi16(mmxY, 4); // x16 to put on par with Cr/Cb values
-         mmxCr = _mm_add_epi16(mmxCr, mmxTemp); // subtract 0x80
-         mmxCb = _mm_add_epi16(mmxCb, mmxTemp);  // subtract 0x80
-         mmxTemp =  _mm_loadu_si128((__m128i *)&s1402[0]); // load the 1.402 constant
-         mmxTemp = _mm_mulhi_epi16(mmxCr, mmxTemp); // almost ready with R
-         mmxR = _mm_add_epi16(mmxTemp, mmxY); // now we have 8 R values
-         mmxTemp = _mm_loadu_si128((__m128i *)&s0714[0]);
-         mmxR = _mm_srai_epi16(mmxR, 4);
-         mmxTemp = _mm_mulhi_epi16(mmxCr, mmxTemp); // Y-0.71414*Cr
-         mmxR = _mm_packus_epi16 (mmxR, mmxR); // i16->u8 bit and saturate
-         mmxG = _mm_add_epi16(mmxY, mmxTemp);
-         mmxTemp = _mm_loadu_si128((__m128i *)&s0344[0]); // Y -= 0.34414*Cb
-         mmxTemp = _mm_mulhi_epi16(mmxCb, mmxTemp);
-         mmxG = _mm_add_epi16(mmxG, mmxTemp); // now we have 8 G values
-         mmxG = _mm_srai_epi16(mmxG, 4);
-         mmxG = _mm_packus_epi16 (mmxG, mmxG); // i16->u8 bit and saturate
-         mmxTemp = _mm_loadu_si128((__m128i *)&s1772[0]); // B = Y - 1.772*Cb
-         mmxTemp = _mm_mulhi_epi16(mmxCb, mmxTemp);
-         mmxB = _mm_add_epi16(mmxY, mmxTemp); // now we have 8 B values
-         mmxB = _mm_srai_epi16(mmxB, 4);
-         mmxTemp = _mm_setzero_si128(); // interleave with 0 to get back to 16-bit values
-         mmxB = _mm_packus_epi16 (mmxB, mmxB); // i16->u8 bit and saturate
-         mmxR = _mm_unpacklo_epi8(mmxR, mmxTemp); // zero-extend to 16-bits again
-         mmxB = _mm_unpacklo_epi8(mmxB, mmxTemp);
-         mmxG = _mm_unpacklo_epi8(mmxG, mmxTemp);
-         mmxR = _mm_srli_epi16(mmxR, 3); // reduce to 5-bits
-         mmxR = _mm_slli_epi16(mmxR, 11); // set in proper position
-         mmxB = _mm_srli_epi16(mmxB, 3); // reduce to 5-bits
-         mmxG = _mm_srli_epi16(mmxG, 2); // reduce to 6-bits
-         mmxG = _mm_slli_epi16(mmxG, 5); // set in proper position
-         mmxTemp = _mm_or_si128(mmxR, mmxG); // R+G
-         mmxTemp = _mm_or_si128(mmxTemp, mmxB); // R+G+B
-         _mm_storeu_si128((__m128i *)pOutput, mmxTemp); // write 8 RGB565 pixels
-         pOutput += iPitch;
-         } // for each row
-     return;
-     }
+    if (x + 8 <= iPitch) { // only for non-clipped MCUs
+        if (pJPEG->ucPixelType == RGB8888) {
+            __m128i mmxY, mmxCr, mmxCb, mmxTemp;
+            __m128i mmxTemp2, mmxR, mmxG, mmxB;
+            iPitch *= 2; // points to 32-bit values, not 16-bit
+            mmxTemp2 = _mm_cmpeq_epi16(_mm_setzero_si128(), _mm_setzero_si128()); // fix Cr/Cb values by subtracting 0x80
+            mmxTemp2 = _mm_slli_epi16 (mmxTemp2, 15); // now has 0x8000, 0x8000...
+            for (iRow=0; iRow<8; iRow++) { // do 8 rows
+                mmxCr = _mm_loadl_epi64((__m128i *)pCr); // load 1 row of Cr
+                mmxCb = _mm_loadl_epi64((__m128i *)pCb); // load 1 row of Cb
+                mmxY = _mm_loadl_epi64((__m128i *)pY); // load 1 row of Y
+                pCr += 8;
+                pCb += 8;
+                pY += 8;
+                mmxCr = _mm_unpacklo_epi8 (_mm_setzero_si128(), mmxCr); // zero-extend 8 Cr values to 16-bits
+                mmxCb = _mm_unpacklo_epi8 (_mm_setzero_si128(), mmxCb); // zero-extend 8 Cb values to 16-bits
+                mmxY = _mm_unpacklo_epi8 (mmxY, _mm_setzero_si128()); // zero-extend 8 Y values to 16-bits
+                mmxCr = _mm_add_epi16(mmxCr, mmxTemp2); // subtract 0x80
+                mmxCb = _mm_add_epi16(mmxCb, mmxTemp2);  // subtract 0x80
+                mmxY = _mm_slli_epi16(mmxY, 4); // x16 to put on par with Cr/Cb values
+                mmxTemp =  _mm_loadu_si128((__m128i *)&s1402[0]); // load the 1.402 constant
+                mmxTemp = _mm_mulhi_epi16(mmxCr, mmxTemp); // almost ready with R
+                mmxR = _mm_add_epi16(mmxTemp, mmxY); // now we have 8 R values
+                mmxTemp = _mm_loadu_si128((__m128i *)&s0714[0]);
+                mmxR = _mm_srai_epi16(mmxR, 4);
+                mmxR = _mm_packus_epi16 (mmxR, mmxR); // i16->u8 bit and saturate
+                mmxTemp = _mm_mulhi_epi16(mmxCr, mmxTemp); // Y-0.71414*Cr
+                mmxG = _mm_add_epi16(mmxY, mmxTemp);
+                mmxTemp = _mm_loadu_si128((__m128i *)&s0344[0]); // Y -= 0.34414*Cb
+                mmxTemp = _mm_mulhi_epi16(mmxCb, mmxTemp);
+                mmxG = _mm_add_epi16(mmxG, mmxTemp); // now we have 8 G values
+                mmxG = _mm_srai_epi16(mmxG, 4);
+                mmxG = _mm_packus_epi16 (mmxG, mmxG); // i16->u8 bit and saturate
+                mmxTemp = _mm_loadu_si128((__m128i *)&s1772[0]); // B = Y - 1.772*Cb
+                mmxTemp = _mm_mulhi_epi16(mmxCb, mmxTemp);
+                mmxB = _mm_add_epi16(mmxY, mmxTemp); // now we have 8 B values
+                mmxB = _mm_srai_epi16(mmxB, 4);
+                mmxB = _mm_packus_epi16 (mmxB, mmxB); // i16->u8 bit and saturate
+                mmxTemp = _mm_cmpeq_epi16(mmxTemp, mmxTemp); // Alpha set to FFFF
+                mmxCr = _mm_unpacklo_epi8(mmxB, mmxG); // interleave 8 B's and 8 G's
+                mmxCb = _mm_unpacklo_epi8(mmxR, mmxTemp); // interlave 8 R's and 8 A's
+                mmxTemp = _mm_unpacklo_epi16(mmxCr, mmxCb); // interleave 4 BG's and 4 RA's
+                mmxCr = _mm_unpackhi_epi16(mmxCr, mmxCb); // interleave 4 BG's and 4 RA's
+                //         _mm_stream_si128((__m128i*)pOutput, mmxTemp);
+                //	_mm_stream_si128((__m128i*)(pOutput+8), mmxCr);
+                _mm_storeu_si128((__m128i *)pOutput, mmxTemp); // write 4 RGBA pixels
+                _mm_storeu_si128((__m128i *)(pOutput+8), mmxCr); // write 4 RGBA pixels
+                pOutput += iPitch;
+            } // for each row
+            return;
+        } else { // 16-bpp
+            __m128i mmxY, mmxCr, mmxCb, mmxTemp;
+            __m128i mmxTemp2, mmxR, mmxG, mmxB;
+            for (iRow=0; iRow<8; iRow++) { // do 8 rows
+                mmxCr = _mm_loadl_epi64((__m128i *)pCr); // load 1 row of Cr
+                mmxCb = _mm_loadl_epi64((__m128i *)pCb); // load 1 row of Cb
+                mmxY = _mm_loadl_epi64((__m128i *)pY); // load 1 row of Y
+                pCr += 8;
+                pCb += 8;
+                pY += 8;
+                mmxTemp = _mm_cmpeq_epi16(mmxY, mmxY); // fix Cr/Cb values by subtracting 0x80
+                mmxTemp = _mm_slli_epi16 (mmxTemp, 15); // now has 0x8000, 0x8000...
+                mmxTemp2 = _mm_setzero_si128(); // zero it to use to set upper bits to 0
+                mmxCr = _mm_unpacklo_epi8 (mmxTemp2, mmxCr); // zero-extend 8 Cr values to 16-bits
+                mmxCb = _mm_unpacklo_epi8 (mmxTemp2, mmxCb); // zero-extend 8 Cb values to 16-bits
+                mmxY = _mm_unpacklo_epi8 (mmxY, mmxTemp2); // zero-extend 8 Y values to 16-bits
+                mmxY = _mm_slli_epi16(mmxY, 4); // x16 to put on par with Cr/Cb values
+                mmxCr = _mm_add_epi16(mmxCr, mmxTemp); // subtract 0x80
+                mmxCb = _mm_add_epi16(mmxCb, mmxTemp);  // subtract 0x80
+                mmxTemp =  _mm_loadu_si128((__m128i *)&s1402[0]); // load the 1.402 constant
+                mmxTemp = _mm_mulhi_epi16(mmxCr, mmxTemp); // almost ready with R
+                mmxR = _mm_add_epi16(mmxTemp, mmxY); // now we have 8 R values
+                mmxTemp = _mm_loadu_si128((__m128i *)&s0714[0]);
+                mmxR = _mm_srai_epi16(mmxR, 4);
+                mmxTemp = _mm_mulhi_epi16(mmxCr, mmxTemp); // Y-0.71414*Cr
+                mmxR = _mm_packus_epi16 (mmxR, mmxR); // i16->u8 bit and saturate
+                mmxG = _mm_add_epi16(mmxY, mmxTemp);
+                mmxTemp = _mm_loadu_si128((__m128i *)&s0344[0]); // Y -= 0.34414*Cb
+                mmxTemp = _mm_mulhi_epi16(mmxCb, mmxTemp);
+                mmxG = _mm_add_epi16(mmxG, mmxTemp); // now we have 8 G values
+                mmxG = _mm_srai_epi16(mmxG, 4);
+                mmxG = _mm_packus_epi16 (mmxG, mmxG); // i16->u8 bit and saturate
+                mmxTemp = _mm_loadu_si128((__m128i *)&s1772[0]); // B = Y - 1.772*Cb
+                mmxTemp = _mm_mulhi_epi16(mmxCb, mmxTemp);
+                mmxB = _mm_add_epi16(mmxY, mmxTemp); // now we have 8 B values
+                mmxB = _mm_srai_epi16(mmxB, 4);
+                mmxTemp = _mm_setzero_si128(); // interleave with 0 to get back to 16-bit values
+                mmxB = _mm_packus_epi16 (mmxB, mmxB); // i16->u8 bit and saturate
+                mmxR = _mm_unpacklo_epi8(mmxR, mmxTemp); // zero-extend to 16-bits again
+                mmxB = _mm_unpacklo_epi8(mmxB, mmxTemp);
+                mmxG = _mm_unpacklo_epi8(mmxG, mmxTemp);
+                mmxR = _mm_srli_epi16(mmxR, 3); // reduce to 5-bits
+                mmxR = _mm_slli_epi16(mmxR, 11); // set in proper position
+                mmxB = _mm_srli_epi16(mmxB, 3); // reduce to 5-bits
+                mmxG = _mm_srli_epi16(mmxG, 2); // reduce to 6-bits
+                mmxG = _mm_slli_epi16(mmxG, 5); // set in proper position
+                mmxTemp = _mm_or_si128(mmxR, mmxG); // R+G
+                mmxTemp = _mm_or_si128(mmxTemp, mmxB); // R+G+B
+                _mm_storeu_si128((__m128i *)pOutput, mmxTemp); // write 8 RGB565 pixels
+                pOutput += iPitch;
+            } // for each row
+            return;
+        }
+    }
 #endif // HAS_SSE
 
 // C reference version
@@ -3522,38 +3523,31 @@ static void JPEGPutMCU11(JPEGIMAGE *pJPEG, int x, int iPitch)
         w = iPitch - x;
         delta = 8 - w;
     }
-    for (iRow=0; iRow<8; iRow++) // up to 8 rows to do
-    {
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
-        {
-            for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
-            {
+    for (iRow=0; iRow<8; iRow++) { // up to 8 rows to do
+        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN) {
+            for (iCol=0; iCol<w; iCol++) { // up to 4x2 cols to do
                 iCr = *pCr++;
                 iCb = *pCb++;
                 Y = (int)(*pY++) << 12;
                 JPEGPixelLE(pOutput+iCol, Y, iCb, iCr);
             } // for col
-            pCr += delta; pCb += delta;
-        }
-        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
-        {
-            for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
-            {
+            pCr += delta; pCb += delta; pY += delta;
+        } else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN) {
+            for (iCol=0; iCol<w; iCol++) { // up to 4x2 cols to do
                 iCr = *pCr++;
                 iCb = *pCb++;
                 Y = (int)(*pY++) << 12;
                 JPEGPixelBE(pOutput+iCol, Y, iCb, iCr);
             } // for col
-            pCr += delta; pCb += delta;
+            pCr += delta; pCb += delta; pY += delta;
         } else { // RGB888
-            for (iCol=0; iCol<w; iCol++) // up to 4x2 cols to do
-            {
+            for (iCol=0; iCol<w; iCol++) { // up to 4x2 cols to do
                 iCr = *pCr++;
                 iCb = *pCb++;
                 Y = (int)(*pY++) << 12;
                 JPEGPixelRGB((uint32_t *)&pOutput[iCol*2], Y, iCb, iCr);
             } // for col
-            pCr += delta; pCb += delta;
+            pCr += delta; pCb += delta; pY += delta;
         }
         pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
     } // for row
@@ -4835,36 +4829,88 @@ static void JPEGPutMCU21(JPEGIMAGE *pJPEG, int x, int iPitch)
     }
 // Full size
     /* Convert YCC pixels into RGB pixels and store in output image */
-    for (iRow=0; iRow<8; iRow++) // up to 8 rows to do
-    {
-        for (iCol=0; iCol<4; iCol++) // up to 4x2 cols to do
-        { // left block
-            iCr = *pCr++;
-            iCb = *pCb++;
-            Y1 = (signed int)(*pY++) << 12;
-            Y2 = (signed int)(*pY++) << 12;
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
-                JPEGPixel2LE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
-            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
-                JPEGPixel2BE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
-            else // RGB8888
-                JPEGPixel2RGB((uint32_t *)&pOutput[iCol*4], Y1, Y2, iCb, iCr);
-            // right block
-            iCr = pCr[3];
-            iCb = pCb[3];
-            Y1 = (signed int)pY[126] << 12;
-            Y2 = (signed int)pY[127] << 12;
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
-                JPEGPixel2LE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
-            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
-                JPEGPixel2BE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
-            else // RGB8888
-                JPEGPixel2RGB((uint32_t *)&pOutput[16 + iCol*4], Y1, Y2, iCb, iCr);
-        } // for col
-        pCb += 4;
-        pCr += 4;
-        pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
-    } // for row
+    if (x + 16 > pJPEG->iWidth) { // slower version with horizontal cropping
+        int iMaxCol = pJPEG->iWidth - x; // how many columns we can draw
+        for (iRow=0; iRow<8; iRow++) { // up to 8 rows to do
+            for (iCol=0; iCol<4; iCol++) { // up to 4x2 cols to do
+                iCr = *pCr++; // left block
+                iCb = *pCb++;
+                Y1 = (signed int)(*pY++) << 12;
+                Y2 = (signed int)(*pY++) << 12;
+                if (iCol * 2 < iMaxCol) {
+                    if (iCol * 2 + 1 < iMaxCol) { // can draw both pixels of the pair
+                        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                            JPEGPixel2LE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
+                        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                            JPEGPixel2BE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
+                        else // RGB8888
+                            JPEGPixel2RGB((uint32_t *)&pOutput[iCol*4], Y1, Y2, iCb, iCr);
+                    } else { // can only draw a single pixel of the pair
+                        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                            JPEGPixelLE(pOutput + iCol*2, Y1, iCb, iCr);
+                        else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                            JPEGPixelBE(pOutput + iCol*2, Y1, iCb, iCr);
+                        else // RGB8888
+                            JPEGPixelRGB((uint32_t *)&pOutput[iCol*4], Y1, iCb, iCr);
+                    }
+                    // right block
+                    if (iCol * 2 + 8 < iMaxCol) {
+                        iCr = pCr[3];
+                        iCb = pCb[3];
+                        Y1 = (signed int)pY[126] << 12;
+                        Y2 = (signed int)pY[127] << 12;
+                        if (iCol * 2 + 9 < iMaxCol) { // can draw both pixels of the pair
+                            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                                JPEGPixel2LE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
+                            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                                JPEGPixel2BE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
+                            else // RGB8888
+                                JPEGPixel2RGB((uint32_t *)&pOutput[16 + iCol*4], Y1, Y2, iCb, iCr);
+                        } else { // can only draw the left pixel of the pair
+                            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                                JPEGPixelLE(pOutput + 8 + iCol*2, Y1, iCb, iCr);
+                            else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                                JPEGPixelBE(pOutput + 8 + iCol*2, Y1, iCb, iCr);
+                            else // RGB8888
+                                JPEGPixelRGB((uint32_t *)&pOutput[16 + iCol*4], Y1, iCb, iCr);
+                        }
+                    }
+                }
+            } // for col
+            pCb += 4;
+            pCr += 4;
+            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+        } // for row
+    } else { // no cropping needed
+        for (iRow=0; iRow<8; iRow++) { // up to 8 rows to do
+            for (iCol=0; iCol<4; iCol++) { // up to 4x2 cols to do
+                iCr = *pCr++; // left block
+                iCb = *pCb++;
+                Y1 = (signed int)(*pY++) << 12;
+                Y2 = (signed int)(*pY++) << 12;
+                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                    JPEGPixel2LE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
+                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                    JPEGPixel2BE(pOutput + iCol*2, Y1, Y2, iCb, iCr);
+                else // RGB8888
+                    JPEGPixel2RGB((uint32_t *)&pOutput[iCol*4], Y1, Y2, iCb, iCr);
+                // right block
+                iCr = pCr[3];
+                iCb = pCb[3];
+                Y1 = (signed int)pY[126] << 12;
+                Y2 = (signed int)pY[127] << 12;
+                if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
+                    JPEGPixel2LE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
+                else if (pJPEG->ucPixelType == RGB565_BIG_ENDIAN)
+                    JPEGPixel2BE(pOutput + 8 + iCol*2, Y1, Y2, iCb, iCr);
+                else // RGB8888
+                    JPEGPixel2RGB((uint32_t *)&pOutput[16 + iCol*4], Y1, Y2, iCb, iCr);
+            } // for col
+            pCb += 4;
+            pCr += 4;
+            pOutput += (pJPEG->ucPixelType == RGB8888) ? iPitch*2 : iPitch;
+        } // for row
+    }
 } /* JPEGPutMCU21() */
 
 // Dither the 8-bit gray pixels into 1, 2, or 4-bit gray
