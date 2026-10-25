@@ -3037,34 +3037,36 @@ static void JPEGPutMCU8BitGray(JPEGIMAGE *pJPEG, int x, int iPitch)
 static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
 {
     uint16_t *usDest = (uint16_t *)&pJPEG->usPixels[x];
+    uint32_t *ulDest = (uint32_t *)&pJPEG->usPixels[x*2];
     int i, j, xcount, ycount, delta;
     uint8_t *pSrc = (uint8_t *)&pJPEG->sMCUs[0];
     
-    if (pJPEG->iOptions & JPEG_SCALE_HALF) // special handling of 1/2 size (pixel averaging)
-    {
+    if (pJPEG->iOptions & JPEG_SCALE_HALF) { // special handling of 1/2 size (pixel averaging)
         int pix;
-        for (i=0; i<4; i++)
-        {
-            if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
-            {
-                for (j=0; j<4; j++)
-                {
+        for (i=0; i<4; i++) {
+            if (pJPEG->ucPixelType == RGB8888) {
+                for (j=0; j<4; j++) {
+                    pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 2) >> 2; // average 2x2 block
+                    ulDest[j] = 0xff000000 | (pix * 0x01010101);
+                    pSrc += 2;
+                }
+                ulDest += iPitch;
+            } else if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN) {
+                for (j=0; j<4; j++) {
                     pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 2) >> 2; // average 2x2 block
                     usDest[j] = usGrayTo565[pix];
                     pSrc += 2;
                 }
-            }
-            else
-            {
-                for (j=0; j<4; j++)
-                {
+                usDest += iPitch;
+            } else {
+                for (j=0; j<4; j++) {
                     pix = (pSrc[0] + pSrc[1] + pSrc[8] + pSrc[9] + 2) >> 2; // average 2x2 block
                     usDest[j] = __builtin_bswap16(usGrayTo565[pix]);
                     pSrc += 2;
                 }
+                usDest += iPitch;
             }
             pSrc += 8; // skip extra line
-            usDest += iPitch;
         }
         return;
     }
@@ -3080,20 +3082,26 @@ static void JPEGPutMCUGray(JPEGIMAGE *pJPEG, int x, int iPitch)
             delta = 8 - xcount;
         }
     }
-    for (i=0; i<ycount; i++) // do up to 8 rows
-    {
-        if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN)
-        {
-            for (j=0; j<xcount; j++)
+    for (i=0; i<ycount; i++) { // do up to 8 rows
+        if (pJPEG->ucPixelType == RGB8888) {
+            for (j=0; j<xcount; j++) {
+                *ulDest++ = 0xff000000 + ((uint32_t)*pSrc++ * 0x01010101);
+            }
+            ulDest -= xcount;
+            ulDest += iPitch;
+        } else if (pJPEG->ucPixelType == RGB565_LITTLE_ENDIAN) {
+            for (j=0; j<xcount; j++) {
                 *usDest++ = usGrayTo565[*pSrc++];
-        }
-        else
-        {
-            for (j=0; j<xcount; j++)
+            }
+            usDest -= xcount;
+            usDest += iPitch; // next line
+        } else {
+            for (j=0; j<xcount; j++) {
                 *usDest++ = __builtin_bswap16(usGrayTo565[*pSrc++]);
+            }
+            usDest -= xcount;
+            usDest += iPitch; // next line
         }
-        usDest -= xcount;
-        usDest += iPitch; // next line
         pSrc += delta;
     }
 } /* JPEGPutMCUGray() */
