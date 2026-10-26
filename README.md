@@ -24,6 +24,7 @@ Features:<br>
 - Includes fast downscaling options (1/2, 1/4, 1/8).
 - Includes option to detect and decode the embedded Exif thumbnail
 - Supports Baseline Huffman images (grayscale or YCbCr)
+- Supports grayscale output from interleaved baseline 8-bit CMYK/YCCK images with 1x1 sampling for all components. Adobe APP14 transforms 0 and 2 and conventional CMYK without APP14 are supported; progressive/subsampled CMYK/YCCK and color output are not supported.
 - Supports thumbnail (DC-only) decoding of progressive JPEG images
 - Now with SIMD (ESP32-S3, Arm NEON, X86 SSE2) optimized color conversion
 - Includes optional Floyd-Steinberg dithering to 1, 2 or 4-bpp grayscale output; useful for e-paper displays<br>
@@ -59,6 +60,16 @@ If you're using the ESP32 or ESP8266 (or another MCU which uses the Harvard Arch
 The API:
 --------
 Please consult the Wiki for detailed info about each method exposed by the JPEGDEC class.
+
+The CMYK/YCCK regression test generates its own images using libjpeg. To run it on a host with libjpeg headers and libraries installed:
+
+```sh
+c++ -std=c++11 -O1 -g -fsanitize=address -fno-omit-frame-pointer \
+    -Isrc linux/tests/cmyk_grayscale.cpp src/JPEGDEC.cpp -ljpeg -o /tmp/jpegdec-cmyk-test
+/tmp/jpegdec-cmyk-test
+```
+
+If libjpeg is installed outside the default compiler paths, add its include and library directories using `-I` and `-L`.
 
 
 If you find this code useful, please consider becoming a sponsor or sending a donation.
