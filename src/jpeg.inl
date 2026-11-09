@@ -1692,6 +1692,11 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                 pPage->iCropX = pPage->iCropY = 0; // initialize crop rectangle to full image size
                 pPage->iCropCY = pPage->iHeight = MOTOSHORT(&s[iOffset+3]);
                 pPage->iCropCX = pPage->iWidth = MOTOSHORT(&s[iOffset+5]);
+                if (s[iOffset+7] < 1 || s[iOffset+7] > MAX_COMPS_IN_SCAN)
+                {
+                    pPage->iError = JPEG_DECODE_ERROR;
+                    return 0; // error
+                }
                 pPage->ucNumComponents = s[iOffset+7];
                 pPage->ucBpp = pPage->ucBpp * pPage->ucNumComponents; /* Bpp = number of components * bits per sample */
                 {
