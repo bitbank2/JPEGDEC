@@ -1110,6 +1110,8 @@ static int JPEGMakeHuffTables(JPEGIMAGE *pJPEG, int bThumbnail)
             pBits = &pHuffVals[iTable * HUFF_TABLEN];
             p = pBits;
             p += 16; // point to bit data
+            if (iTable * DC_TABLE_SIZE >= (int)sizeof(pJPEG->ucHuffDC))
+                return 0; // table ID out of range
             cc = 0; // start with a code of 0
             for (iBitNum = 1; iBitNum <= 16; iBitNum++)
             {
@@ -1357,6 +1359,7 @@ static void GetTIFFInfo(JPEGIMAGE *pPage, int bMotorola, int iOffset)
     int iTag, iTagCount, i;
     uint8_t *cBuf = pPage->ucFileBuf;
     
+    if (iOffset + 2 >= JPEG_FILE_BUF_SIZE) return;
     iTagCount = TIFFSHORT(&cBuf[iOffset], bMotorola);  /* Number of tags in this dir */
     if (iTagCount < 1 || iTagCount > 256) // invalid tag count
         return; /* Bad header info */
@@ -1669,7 +1672,9 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                     bMotorola = (s[iOffset+8] == 'M');
                     IFD = TIFFLONG(&s[iOffset+12], bMotorola);
                     iTagCount = TIFFSHORT(&s[iOffset+16], bMotorola);
-                    GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8);
+                    if (IFD != 0 && (IFD + iOffset + 8) < JPEG_FILE_BUF_SIZE) {
+                        GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8);
+                    }
                     // The second IFD defines the thumbnail (if present)
                     if (iTagCount >= 1 && iTagCount < 32) // valid number of tags for EXIF data 'page'
                     {
@@ -1744,7 +1749,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                 /* first byte has PPPPNNNN where P = precision and N = table number 0-3 */
                 iOffset += 2; // skip length
                 usLen -= 2; // subtract length length
-                while (usLen > 0)
+                while (usLen > 0 && usLen < 32768) // don't let it wrap around to negative values
                 {
                     ucTable = s[iOffset++]; // table number
                     if ((ucTable & 0xf) > 3) // invalid table number
