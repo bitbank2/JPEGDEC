@@ -1356,13 +1356,17 @@ static int TIFFVALUE(unsigned char *p, int bMotorola)
 } /* TIFFVALUE() */
 static void GetTIFFInfo(JPEGIMAGE *pPage, int bMotorola, int iOffset)
 {
-    int iTag, iTagCount, i;
+    int iTag, iTagCount, iMaxTags, i;
     uint8_t *cBuf = pPage->ucFileBuf;
     
-    if (iOffset + 2 >= JPEG_FILE_BUF_SIZE) return;
+    if (iOffset < 0 || iOffset + 2 >= JPEG_FILE_BUF_SIZE) return;
     iTagCount = TIFFSHORT(&cBuf[iOffset], bMotorola);  /* Number of tags in this dir */
     if (iTagCount < 1 || iTagCount > 256) // invalid tag count
         return; /* Bad header info */
+    // every 12-byte tag entry (TIFFVALUE reads all of it) must lie inside the buffer
+    iMaxTags = (JPEG_FILE_BUF_SIZE - iOffset - 2) / 12;
+    if (iTagCount > iMaxTags)
+        iTagCount = iMaxTags;
     /*--- Search the TIFF tags ---*/
     for (i=0; i<iTagCount; i++)
     {
@@ -1666,25 +1670,27 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
             case 0xffe1: // App1 (EXIF?)
                 if (s[iOffset+2] == 'E' && s[iOffset+3] == 'x' && (s[iOffset+8] == 'M' || s[iOffset+8] == 'I')) // the EXIF data we want
                 {
-                    int bMotorola, IFD, iTagCount;
+                    int bMotorola, iTagCount;
+                    uint32_t IFD; // the IFD offsets come from the file: keep them unsigned and range check them
+                    int64_t iLimit = (int64_t)JPEG_FILE_BUF_SIZE - (iOffset + 8); // bytes of the file buffer after the TIFF header start
                     pPage->iEXIF = iFilePos - iBytesRead + iOffset + 8; // start of TIFF file
                     // Get the orientation value (if present)
                     bMotorola = (s[iOffset+8] == 'M');
                     IFD = TIFFLONG(&s[iOffset+12], bMotorola);
                     iTagCount = TIFFSHORT(&s[iOffset+16], bMotorola);
-                    if (IFD != 0 && (IFD + iOffset + 8) < JPEG_FILE_BUF_SIZE) {
-                        GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8);
+                    if (IFD != 0 && (int64_t)IFD < iLimit) {
+                        GetTIFFInfo(pPage, bMotorola, (int)IFD + iOffset + 8);
                     }
                     // The second IFD defines the thumbnail (if present)
-                    if (iTagCount >= 1 && iTagCount < 32) // valid number of tags for EXIF data 'page'
+                    if (iTagCount >= 1 && iTagCount < 32 && (int64_t)IFD + (12 * iTagCount) + 2 + 4 <= iLimit) // valid number of tags for EXIF data 'page'
                     {
                        // point to next IFD
                         IFD += (12 * iTagCount) + 2;
                         IFD = TIFFLONG(&s[IFD + iOffset + 8], bMotorola);
-                        if (IFD != 0 && IFD + iOffset + 8 < JPEG_FILE_BUF_SIZE) // Thumbnail present?
+                        if (IFD != 0 && (int64_t)IFD < iLimit) // Thumbnail present?
                         {
                             pPage->ucHasThumb = 1;
-                            GetTIFFInfo(pPage, bMotorola, IFD+iOffset+8); // info for second 'page' of TIFF
+                            GetTIFFInfo(pPage, bMotorola, (int)IFD + iOffset + 8); // info for second 'page' of TIFF
                             pPage->iThumbData += iOffset + 8; // absolute offset in the file
                         }
                     }
