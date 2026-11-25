@@ -1705,6 +1705,7 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                 pPage->ucNumComponents = i;
                 pPage->ucBpp = pPage->ucBpp * pPage->ucNumComponents; /* Bpp = number of components * bits per sample */
                 {
+                    uint8_t ucChromaBlocks = 0, ucChromaBad = 0;
                     usLen -= 8;
                     iOffset += 8;
 //                    pPage->ucSubSample = s[iOffset+9]; // subsampling option for the second color component
@@ -1716,6 +1717,14 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                         ucSamp = s[iOffset++]; // get the h+v sampling factor
                         if (i == 0) // Y component?
                             pPage->ucSubSample = ucSamp;
+                        else
+                        {
+                            uint8_t h = ucSamp >> 4, v = ucSamp & 0xf;
+                            // MCU geometry comes from Y, so chroma can't exceed it
+                            if (!h || !v || h > (pPage->ucSubSample >> 4) || v > (pPage->ucSubSample & 0xf))
+                                ucChromaBad = 1;
+                            ucChromaBlocks += h * v;
+                        }
 //                        pPage->JPCI[i].h_samp_factor = ucSamp >> 4;
 //                        pPage->JPCI[i].v_samp_factor = ucSamp & 0xf;
                         pPage->JPCI[i].quant_tbl_no = s[iOffset++]; // quantization table number
@@ -1726,6 +1735,10 @@ static int JPEGParseInfo(JPEGIMAGE *pPage, int bExtractThumb)
                         }
                         usLen -= 3;
                     }
+                    pPage->ucExtraChroma = 0;
+                    // 0xff marks a chroma layout the MCU geometry can't handle
+                    if (pPage->ucNumComponents == 3)
+                        pPage->ucExtraChroma = ucChromaBad ? 0xff : (uint8_t)(ucChromaBlocks - 2);
                 }
                 if (pPage->ucNumComponents == 1) {
                     pPage->ucSubSample = 0; // use this to differentiate from color 1:1
@@ -5024,7 +5037,7 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     int cx, cy, x, y, mcuCX, mcuCY;
     int iLum0, iLum1, iLum2, iLum3, iCr, iCb;
     signed int iDCPred0, iDCPred1, iDCPred2;
-    int i, iQuant1, iQuant2, iQuant3, iErr;
+    int i, k, iQuant1, iQuant2, iQuant3, iErr;
     int iSkipMask, bSkipRow;
     int iDMASize, iDMAOffset;
     uint16_t *pAlignedPixels = pJPEG->usPixels;
@@ -5066,6 +5079,11 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
     }
     if (pJPEG->iOptions & JPEG_LUMA_ONLY && pJPEG->ucPixelType < EIGHT_BIT_GRAYSCALE) {
         pJPEG->ucPixelType = EIGHT_BIT_GRAYSCALE; // switch to grayscale output
+    }
+    if (pJPEG->ucExtraChroma == 0xff ||
+        (pJPEG->ucExtraChroma && pJPEG->ucPixelType < EIGHT_BIT_GRAYSCALE)) {
+        pJPEG->iError = JPEG_UNSUPPORTED_FEATURE;
+        return 0; // chroma layout the MCU code can't do
     }
     // reorder and fix the quantization table for decoding
     JPEGFixQuantD(pJPEG);
@@ -5306,6 +5324,12 @@ static int DecodeJPEG(JPEGIMAGE *pJPEG)
                     } else {
                         iErr |= JPEGDecodeMCU(pJPEG, MCU_SKIP, &iDCPred1); // decode Cr block
                         iErr |= JPEGDecodeMCU(pJPEG, MCU_SKIP, &iDCPred2); // decode Cb block
+                    }
+                    for (k = 0; k < pJPEG->ucExtraChroma; k++) { // extra chroma blocks in this MCU
+                        if (pJPEG->ucMode == 0xc2) // progressive
+                            iErr |= JPEGDecodeMCU_P(pJPEG, MCU_SKIP, &iDCPred2);
+                        else
+                            iErr |= JPEGDecodeMCU(pJPEG, MCU_SKIP, &iDCPred2);
                     }
                 } else {
                     if (pJPEG->ucMode == 0xc2) { // progressive

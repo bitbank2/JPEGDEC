@@ -205,6 +205,7 @@ typedef struct jpeg_image_tag
     int iCropX, iCropY, iCropCX, iCropCY; // crop area
     uint8_t ucBpp, ucSubSample, ucHuffTableUsed;
     uint8_t ucMode, ucOrientation, ucHasThumb, b11Bit;
+    uint8_t ucExtraChroma; // chroma blocks per MCU beyond expected 2
     uint8_t ucComponentsInScan, cApproxBitsLow, cApproxBitsHigh;
     uint8_t iScanStart, iScanEnd, ucFF, ucNumComponents;
     uint8_t ucACTable, ucDCTable;
