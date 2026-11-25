@@ -13,6 +13,9 @@
 #include "../../../src/JPEGDEC.cpp"
 #include "../../../test_images/tulips.h" // 640x480 56k byte test image
 #include "../../../test_images/thumb_test.h" // thumbnail extraction
+#include "../../../test_images/sampling_mixed.h" // Y 0x22, chroma 0x12
+#include "../../../test_images/sampling_progressive_mixed.h" // progressive, Y 0x22, chroma 0x12
+#include "../../../test_images/sampling_unsupported.h" // chroma sampling exceeds luma
 #include "corrupt1.h" // invalid header offsets
 #include "corrupt2.h" // global buffer overflow 1
 #include "corrupt3.h" // global buffer overflow 2
@@ -64,6 +67,56 @@ int JPEGDraw(JPEGDRAW *pDraw)
     if (pDraw->y + pDraw->iHeight-1 > y2) y2 = pDraw->y + pDraw->iHeight-1;
     return 1; // continue to decode
 } /* JPEGDraw() */
+
+//
+// Decode a sampling-factor image as grayscale and check the drawn extents
+//
+int CheckSamplingDecode(char *szTestName, const uint8_t *pData, int iSize, int iExpectedW, int iExpectedH)
+{
+    int w = 0, h = 0;
+    x1 = y1 = 1000;
+    x2 = y2 = 0;
+    JPEGLOG(__LINE__, szTestName, " - START");
+    if (jpg.openFLASH(pData, iSize, JPEGDraw)) {
+        if (jpg.decode(0,0,JPEG_LUMA_ONLY)) {
+            w = 1 + x2 - x1;
+            h = 1 + y2 - y1;
+        }
+        jpg.close();
+        if (w == iExpectedW && h == iExpectedH) {
+            JPEGLOG(__LINE__, szTestName, " - PASSED");
+            return 1;
+        }
+        printf("Expected %dx%d, decoded %dx%d\n", iExpectedW, iExpectedH, w, h);
+    } else {
+        JPEGLOG(__LINE__, szTestName, " - open failed");
+    }
+    JPEGLOG(__LINE__, szTestName, " - FAILED");
+    return 0;
+} /* CheckSamplingDecode() */
+
+//
+// Confirm that an unsupported chroma layout is rejected before decoding
+//
+int CheckSamplingReject(char *szTestName, const uint8_t *pData, int iSize, int iOptions)
+{
+    int rc, iError;
+    JPEGLOG(__LINE__, szTestName, " - START");
+    if (jpg.openFLASH(pData, iSize, JPEGDraw)) {
+        rc = jpg.decode(0,0,iOptions);
+        iError = jpg.getLastError();
+        jpg.close();
+        if (rc == 0 && iError == JPEG_UNSUPPORTED_FEATURE) {
+            JPEGLOG(__LINE__, szTestName, " - PASSED");
+            return 1;
+        }
+        printf("decode returned %d, error %d\n", rc, iError);
+    } else {
+        JPEGLOG(__LINE__, szTestName, " - open failed");
+    }
+    JPEGLOG(__LINE__, szTestName, " - FAILED");
+    return 0;
+} /* CheckSamplingReject() */
 
 int main(int argc, const char * argv[]) {
     int i, rc, iTime1, iTime2;
@@ -257,6 +310,42 @@ int main(int argc, const char * argv[]) {
     } else {
         iTotalFail++;
         JPEGLOG(__LINE__, szTestName, " - open failed");
+    }
+
+    // Test 11 - Y sampled 2x2, chroma sampled 1x2
+    iTotal++;
+    if (CheckSamplingDecode((char *)"JPEG mixed sampling", sampling_mixed, sizeof(sampling_mixed), 32, 32)) {
+        iTotalPass++;
+    } else {
+        iTotalFail++;
+    }
+    // Test 12 - progressive version of the same thing; these decode at 1/8 scale
+    iTotal++;
+    if (CheckSamplingDecode((char *)"JPEG progressive mixed sampling", sampling_progressive_mixed, sizeof(sampling_progressive_mixed), 4, 4)) {
+        iTotalPass++;
+    } else {
+        iTotalFail++;
+    }
+    // Test 13 - chroma sampled more horizontally than luma must be rejected
+    iTotal++;
+    if (CheckSamplingReject((char *)"JPEG invalid horizontal sampling", sampling_bad_h, sizeof(sampling_bad_h), JPEG_LUMA_ONLY)) {
+        iTotalPass++;
+    } else {
+        iTotalFail++;
+    }
+    // Test 14 - chroma sampled more vertically than luma must be rejected
+    iTotal++;
+    if (CheckSamplingReject((char *)"JPEG invalid vertical sampling", sampling_bad_v, sizeof(sampling_bad_v), JPEG_LUMA_ONLY)) {
+        iTotalPass++;
+    } else {
+        iTotalFail++;
+    }
+    // Test 15 - color output must reject chroma layouts with extra blocks
+    iTotal++;
+    if (CheckSamplingReject((char *)"JPEG unsupported color sampling", sampling_mixed, sizeof(sampling_mixed), 0)) {
+        iTotalPass++;
+    } else {
+        iTotalFail++;
     }
 
     // FUZZ testing
